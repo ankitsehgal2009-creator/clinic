@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\ApiController;
+use App\Http\Controllers\AppearanceController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
@@ -25,6 +26,8 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'page'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::view('/no-access', 'no-access')->name('no-access');
+    Route::get('/appearance', [AppearanceController::class, 'show'])->name('appearance');
+    Route::post('/appearance', [AppearanceController::class, 'save']);
 
     Route::get('/dashboard', DashboardController::class)->middleware('page:dashboard')->name('dashboard');
 
@@ -42,6 +45,7 @@ Route::middleware(['auth', 'page'])->group(function () {
 
     Route::middleware('page:import')->group(function () {
         Route::get('/patients/import', [ImportController::class, 'show'])->name('import.show');
+        Route::get('/patients/import/sample', [ImportController::class, 'sample'])->name('import.sample');
         Route::post('/patients/import/read', [ImportController::class, 'read'])->name('import.read');
         Route::post('/patients/import', [ImportController::class, 'store'])->name('import.store');
     });
@@ -91,5 +95,6 @@ Route::middleware(['auth', 'page'])->group(function () {
     Route::middleware('page:settings')->group(function () {
         Route::get('/settings', [SettingsController::class, 'show'])->name('settings');
         Route::post('/settings', [SettingsController::class, 'save']);
+        Route::post('/settings/logo', [SettingsController::class, 'logo'])->name('settings.logo');
     });
 });

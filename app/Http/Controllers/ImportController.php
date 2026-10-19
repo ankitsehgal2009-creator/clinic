@@ -17,6 +17,27 @@ class ImportController extends Controller
         return view('patients.import');
     }
 
+    /** A sample CSV with every column SmileDesk can read, so people can see the format. Opens in Excel. */
+    public function sample()
+    {
+        $rows = [
+            ['Old patient ID', 'Full name', 'Mobile number', 'Gender', 'Date of birth', 'Age', 'Father / husband name', 'Address', 'Medical history'],
+            ['1021', 'Rohan Deshpande', '9820145567', 'Male', '12/03/1992', '', 'Suresh Deshpande', 'Andheri West, Mumbai', 'Diabetes; BP'],
+            ['1022', 'Meera Iyer', '+91 99300 21456', 'Female', '', '29', 'Karthik Iyer', 'Powai, Mumbai', ''],
+            ['1023', 'Aditya Joshi', '09892560031', 'M', '14-12-2016', '', 'Nikhil Joshi', '', 'Allergic to penicillin'],
+        ];
+        $out = fopen('php://temp', 'r+');
+        fwrite($out, "\xEF\xBB\xBF"); // so Excel shows ₹ and Hindi names correctly
+        foreach ($rows as $row) {
+            fputcsv($out, $row, ',', '"', '');
+        }
+        rewind($out);
+        return response(stream_get_contents($out), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="smiledesk-sample-patients.csv"',
+        ]);
+    }
+
     /** Reads an uploaded CSV or .xlsx and sends its rows back so the browser can map columns. */
     public function read(Request $r)
     {

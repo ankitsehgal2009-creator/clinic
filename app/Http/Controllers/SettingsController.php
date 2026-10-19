@@ -20,7 +20,7 @@ class SettingsController extends Controller
     public function save(Request $r)
     {
         $me = $this->me();
-        abort_unless($me->isAdmin(), 403, 'Only the admin can change clinic settings.');
+        abort_unless($me->canManageClinic(), 403, 'Only the admin or the owner doctor can change clinic settings.');
         $time = ['required', 'regex:/^\d{2}:\d{2}$/'];
         $v = $r->validate([
             'name' => 'required|string|min:2|max:150',
@@ -35,7 +35,8 @@ class SettingsController extends Controller
         $min = fn ($t) => (int) substr($t, 0, 2) * 60 + (int) substr($t, 3, 2);
         [$mo, $mc, $eo, $ec] = array_map($min, [$v['morning_open'], $v['morning_close'], $v['evening_open'], $v['evening_close']]);
         if (! ($mo < $mc && $mc <= $eo && $eo < $ec)) {
-            return back()->withInput()->with('error', 'Hours must go in order: opens, break starts, break ends, closes.');
+            $msg = 'Hours must go in order: opens, break starts, break ends, closes.';
+            return $r->expectsJson() ? response()->json(['error' => $msg], 422) : back()->withInput()->with('error', $msg);
         }
         $me->clinic->update([
             'name' => $v['name'], 'address' => $v['address'], 'city' => $v['city'], 'phone' => $v['phone'],
@@ -49,7 +50,19 @@ class SettingsController extends Controller
         foreach ($have as $i => $chair) {
             $chair->update(['active' => $i < $v['chairs']]);
         }
+        $changed = array_keys($me->clinic->getChanges());
         Activity::log($me, 'Changed clinic settings');
-        return back()->with('ok', 'Settings saved.');
+        return $r->expectsJson() ? response()->json(['ok' => true, 'changed' => $changed]) : back()->with('ok', 'Settings saved.');
+    }
+
+    /** Clinic logo, printed on bills and shown in the menu. Empty removes it. */
+    public function logo(Request $r)
+    {
+        $me = $this->me();
+        abort_unless($me->canManageClinic(), 403, 'Only the admin or the owner doctor can change the clinic logo.');
+        $v = $r->validate(['logo' => ['nullable', 'string', 'max:400000', self::imageRule()]], ['logo.max' => 'That logo is too large. Try a smaller picture.']);
+        $me->clinic->update(['logo' => $v['logo'] ?: null]);
+        Activity::log($me, $v['logo'] ? 'Changed clinic logo' : 'Removed clinic logo');
+        return response()->json(['ok' => true]);
     }
 }

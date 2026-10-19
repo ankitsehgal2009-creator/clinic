@@ -17,11 +17,11 @@ php artisan serve            # http://localhost:8000
 
 The demo logins all use the password `demo1234`:
 
-| Role | Mobile |
-| --- | --- |
-| Admin | 9820077134 |
-| Doctor | 9819022417 |
-| Receptionist | 9004018822 |
+| Role | Username | Mobile |
+| --- | --- | --- |
+| Admin | vikram | 9820077134 |
+| Doctor (owner) | ananya | 9819022417 |
+| Receptionist | priya | 9004018822 |
 
 ## Where things are
 
@@ -45,4 +45,8 @@ The demo logins all use the password `demo1234`:
 - **Booking checks on the server:** the slot must be inside clinic hours, not in the past (India time), and not already taken on that chair.
 - **Bills:** money is stored in paise. Bill numbers run per financial year, like SC/26-27/0001, and restart on 1 April. Treatment is GST-exempt; a taxed line is split into CGST and SGST. A bill with only exempt lines prints as "Bill of Supply". Bills are never edited or deleted by staff, only cancelled (number kept); a bill with payments can't be cancelled until the admin removes the payments.
 - **Cash closing:** expected cash = opening (what was left in the drawer at the last closing) + cash received − paid out. A mismatch needs a reason. Only the admin can reopen a closed day.
+- **Login:** everyone has a unique username. Mobile numbers can be shared (for example, a doctor who is also the admin); signing in with a shared mobile asks for the username instead.
+- **Clinic settings and logo:** the Admin and the owner doctor (the doctor added at setup) can change them. Settings save by themselves when a field changes.
+- **Appearance:** each person picks their own colour theme, light or dark, menu style, text size and corners on the Appearance page. It only changes their own screen.
+- **Printing:** bills and the daily cash report open print options first: paper (A4, A5, Letter), orientation, margins, and fit to one page or a fixed size.
 - **Activity log:** every change writes one line saying who did what, and when.

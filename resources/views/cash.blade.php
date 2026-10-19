@@ -4,12 +4,13 @@
 @php($me = auth()->user())
 @php($isToday = $date === Fmt::today())
 @section('title', 'Daily cash closing · SmileDesk')
+@section('bodyclass', 'has-report')
 @section('content')
 <div class="ph">
   <div><h1>Daily cash closing</h1><p>{{ Fmt::date($date) }}@if ($closing) · closed by {{ $closing->closer?->name }} at {{ $closing->created_at->format('g:i A') }}@endif</p></div>
   <div class="row"><div data-datepicker data-plain data-value="{{ $date }}" data-max="{{ Fmt::today() }}" data-go="{{ route('cash.show') }}"></div>
     @if ($closing)<span class="chip c-ok">Day closed</span>@endif
-    <button type="button" class="btn" onclick="window.print()">Print</button></div>
+    <button type="button" class="btn" data-print=".print-report">Print</button></div>
 </div>
 <div class="grid g4" style="margin-bottom:16px">
   @foreach (['CASH', 'UPI', 'CARD'] as $m)
@@ -104,5 +105,66 @@
       <p class="muted">No payments on this day.</p>
     @endif
   </div>
+</div>
+{{-- One-page report used only for printing; the Print button scales it to fit the chosen paper --}}
+@php($cl = $me->clinic)
+@php($c = $closing)
+<div class="print-report rep">
+  <div class="lh">
+    <div>@if ($cl->logo)<img src="{{ $cl->logo }}" alt="">@endif<h3>{{ $cl->name }}</h3><div>{{ $cl->address }}, {{ $cl->city }} · {{ $cl->phone }}</div></div>
+    <div style="text-align:right"><b style="font-size:14px">Daily cash closing</b><div>{{ Fmt::date($date) }}</div><div>{{ $c ? 'Closed by '.$c->closer?->name.' at '.$c->created_at->format('g:i A') : 'Not closed yet' }}</div></div>
+  </div>
+  <div class="kp">
+    @foreach (['CASH', 'UPI', 'CARD'] as $m)<div>{{ $byMode[$m]['label'] }}<b>{{ Money::inr($byMode[$m]['sum']) }}</b>{{ $byMode[$m]['n'] }} {{ $byMode[$m]['n'] === 1 ? 'payment' : 'payments' }}</div>@endforeach
+    <div>Total collected<b>{{ Money::inr($collected) }}</b>@if ($byMode['BANK']['sum'] + $byMode['CHEQUE']['sum'])incl. {{ Money::inr($byMode['BANK']['sum'] + $byMode['CHEQUE']['sum']) }} bank/cheque @endif</div>
+  </div>
+  <div class="cols">
+    <div>
+      <h4>Cash in drawer</h4>
+      <table>
+        <tr><td>Opening balance</td><td class="r">{{ Money::inr($c->opening ?? $opening) }}</td></tr>
+        <tr><td>Cash received</td><td class="r">+ {{ Money::inr($c->cash_in ?? $cashIn) }}</td></tr>
+        <tr><td>Paid out</td><td class="r">− {{ Money::inr($c->paid_out ?? $paidOut) }}</td></tr>
+        <tr><td><b>Should be in drawer</b></td><td class="r"><b>{{ Money::inr($c->expected ?? $expected) }}</b></td></tr>
+        @if ($c)
+          <tr><td>Counted</td><td class="r">{{ Money::inr($c->counted) }}</td></tr>
+          <tr><td>Difference</td><td class="r">{{ $c->counted === $c->expected ? 'Matched' : ($c->counted > $c->expected ? 'Extra ' : 'Short ').Money::inr(abs($c->counted - $c->expected)) }}</td></tr>
+          @if ($c->reason)<tr><td colspan="2">Reason: {{ $c->reason }}</td></tr>@endif
+          <tr><td>Left in drawer</td><td class="r">{{ Money::inr($c->kept) }}</td></tr>
+          @if ($c->counted > $c->kept)<tr><td>Taken out (bank or owner)</td><td class="r">{{ Money::inr($c->counted - $c->kept) }}</td></tr>@endif
+        @endif
+      </table>
+    </div>
+    <div>
+      <h4>Notes counted</h4>
+      @if ($c)
+        <table>
+          <tr><th>Note</th><th class="r">Count</th><th class="r">Amount</th></tr>
+          @foreach (Money::NOTES as $n)<tr><td>₹{{ $n }}</td><td class="r">{{ $c->notes_count[$n] ?? 0 }}</td><td class="r">{{ Money::inr($n * ($c->notes_count[$n] ?? 0) * 100) }}</td></tr>@endforeach
+          <tr><td>Coins</td><td class="r"></td><td class="r">{{ Money::inr(($c->notes_count['coins'] ?? 0) * 100) }}</td></tr>
+          <tr><td><b>Total</b></td><td></td><td class="r"><b>{{ Money::inr($c->counted) }}</b></td></tr>
+        </table>
+      @else
+        <p>The day is not closed yet, so no notes were counted.</p>
+      @endif
+    </div>
+  </div>
+  <h4>Paid out of the drawer</h4>
+  @if ($payouts->isNotEmpty())
+    <table><tr><th>What for</th><th>By</th><th>Time</th><th class="r">Amount</th></tr>
+      @foreach ($payouts as $p)<tr><td>{{ $p->description }}</td><td>{{ $p->user?->name }}</td><td>{{ $p->created_at->format('g:i A') }}</td><td class="r">{{ Money::inr($p->amount) }}</td></tr>@endforeach
+      <tr><td colspan="3"><b>Total paid out</b></td><td class="r"><b>{{ Money::inr($paidOut) }}</b></td></tr></table>
+  @else
+    <p>Nothing paid out.</p>
+  @endif
+  <h4>Payments received</h4>
+  @if ($payments->isNotEmpty())
+    <table><tr><th>Patient</th><th>Bill</th><th>Mode</th><th>Received by</th><th class="r">Amount</th></tr>
+      @foreach ($payments as $p)<tr><td>{{ $p->patient?->name }} ({{ $p->patient?->code }})</td><td>{{ $p->invoice?->number }}</td><td>{{ Money::MODES[$p->mode] ?? $p->mode }}</td><td>{{ $p->receiver?->name }}</td><td class="r">{{ Money::inr($p->amount) }}</td></tr>@endforeach
+      <tr><td colspan="4"><b>Total</b></td><td class="r"><b>{{ Money::inr($collected) }}</b></td></tr></table>
+  @else
+    <p>No payments on this day.</p>
+  @endif
+  <div class="signs"><div>Counted by</div><div>Checked by</div></div>
 </div>
 @endsection

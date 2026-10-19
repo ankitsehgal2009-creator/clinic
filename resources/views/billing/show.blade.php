@@ -13,14 +13,14 @@
   <div class="row">
     <a class="btn" href="{{ route('billing.index') }}">All bills</a>
     <a class="btn" href="{{ route('billing.create', ['patient' => $inv->patient_id]) }}">New bill for {{ explode(' ', $inv->patient->name)[0] }}</a>
-    <button type="button" class="btn pri" onclick="window.print()">Print</button>
+    <button type="button" class="btn pri" data-print=".paper">Print</button>
   </div>
 </div>
 
 <div class="billgrid">
   <div class="paper">
     <div class="lh">
-      <div><h3>{{ $c->name }}</h3><div class="sm">{{ $c->address }}, {{ $c->city }}<br>Phone {{ $c->phone }}@if ($c->gstin)<br>GSTIN <span class="mono">{{ $c->gstin }}</span>@if (Money::stateOf($c->gstin)) · State: {{ Money::stateOf($c->gstin) }} ({{ substr($c->gstin, 0, 2) }})@endif @endif</div></div>
+      <div>@if ($c->logo)<img class="clogo" src="{{ $c->logo }}" alt="">@endif<h3>{{ $c->name }}</h3><div class="sm">{{ $c->address }}, {{ $c->city }}<br>Phone {{ $c->phone }}@if ($c->gstin)<br>GSTIN <span class="mono">{{ $c->gstin }}</span>@if (Money::stateOf($c->gstin)) · State: {{ Money::stateOf($c->gstin) }} ({{ substr($c->gstin, 0, 2) }})@endif @endif</div></div>
       <div style="text-align:right"><b style="font-size:1.05rem">{{ $inv->title($c->gstin) }}</b><div class="sm">No. <span class="mono">{{ $inv->number }}</span><br>Date {{ date('j M Y', strtotime($inv->date)) }}</div>@if ($inv->cancelled_at)<div class="stamp">CANCELLED</div>@endif</div>
     </div>
     <div class="sm" style="margin-bottom:10px">Bill to: <b style="color:#1f2422">{{ $inv->patient->name }}</b> ({{ $inv->patient->code }}) · {{ Fmt::showMobile($inv->patient->mobile) }}@if ($inv->patient->relativeLabel()) · {{ $inv->patient->relativeLabel() }}@endif @if ($c->gstin && Money::stateOf($c->gstin))<br>Place of supply: {{ Money::stateOf($c->gstin) }}@endif</div>

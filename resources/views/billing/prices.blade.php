@@ -14,22 +14,20 @@
   </div>
   <div style="margin-top:14px"><button class="btn pri">Add</button></div>
 </form>
-<div class="tw"><table><thead><tr><th>Treatment</th><th>Price ₹</th><th>GST</th><th>SAC</th><th></th><th>On</th></tr></thead><tbody>
+<div class="tw"><table class="prices">
+  <thead><tr><th>Treatment</th><th>Price ₹</th><th>GST</th><th>SAC</th><th></th><th style="text-align:center">On</th></tr></thead>
+  <tbody>
   @foreach ($rows as $p)
     <tr class="{{ $p->active ? '' : 'off' }}">
-      <td colspan="5" style="padding:6px 12px">
-        <form method="post" action="{{ route('billing.prices.update', $p) }}" class="row" style="flex-wrap:nowrap">
-          @csrf
-          <input name="name" class="inp" value="{{ $p->name }}" aria-label="Treatment" style="min-width:200px">
-          <input name="price" class="inp mono" value="{{ Money::plain($p->price) }}" aria-label="Price for {{ $p->name }}" style="width:110px">
-          <select name="gst_rate" class="inp" aria-label="GST for {{ $p->name }}" style="width:100px">@foreach (Money::GST_RATES as $g)<option value="{{ $g }}" @selected($p->gst_rate === $g)>{{ $g ? $g.'%' : 'Exempt' }}</option>@endforeach</select>
-          <input name="sac" class="inp mono" value="{{ $p->sac }}" aria-label="SAC for {{ $p->name }}" style="width:100px">
-          <button class="btn sm">Save</button>
-        </form>
-      </td>
-      <td><button type="button" class="toggle {{ $p->active ? 'on' : '' }}" aria-pressed="{{ $p->active ? 'true' : 'false' }}" aria-label="Use {{ $p->name }}" data-toggle="{{ route('billing.prices.active', $p) }}"></button></td>
+      <td><form id="pr{{ $p->id }}" method="post" action="{{ route('billing.prices.update', $p) }}">@csrf</form><input form="pr{{ $p->id }}" name="name" class="inp" value="{{ $p->name }}" aria-label="Treatment"></td>
+      <td><input form="pr{{ $p->id }}" name="price" class="inp mono" value="{{ Money::plain($p->price) }}" inputmode="decimal" aria-label="Price for {{ $p->name }}"></td>
+      <td><select form="pr{{ $p->id }}" name="gst_rate" class="inp" aria-label="GST for {{ $p->name }}">@foreach (Money::GST_RATES as $g)<option value="{{ $g }}" @selected($p->gst_rate === $g)>{{ $g ? $g.'%' : 'Exempt' }}</option>@endforeach</select></td>
+      <td><input form="pr{{ $p->id }}" name="sac" class="inp mono" value="{{ $p->sac }}" aria-label="SAC for {{ $p->name }}"></td>
+      <td><button form="pr{{ $p->id }}" class="btn sm">Save</button></td>
+      <td style="text-align:center"><button type="button" class="toggle {{ $p->active ? 'on' : '' }}" aria-pressed="{{ $p->active ? 'true' : 'false' }}" aria-label="Use {{ $p->name }}" data-toggle="{{ route('billing.prices.active', $p) }}"></button></td>
     </tr>
   @endforeach
-</tbody></table></div>
+  </tbody>
+</table></div>
 <p class="hint">Turn a treatment off to hide it from new bills. Old bills keep their prices.</p>
 @endsection

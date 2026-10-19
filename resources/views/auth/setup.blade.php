@@ -16,6 +16,14 @@
         <div class="field"><label for="cg">GSTIN (optional)</label><input id="cg" name="clinic[gstin]" class="inp mono" maxlength="15" value="{{ old('clinic.gstin') }}"></div>
         <div class="field"><label for="cx">Patient ID prefix</label><input id="cx" name="clinic[prefix]" class="inp mono" maxlength="6" value="{{ old('clinic.prefix', 'P-') }}" required><span class="hint">IDs will look like P-0001</span></div>
         <div class="field"><label for="ch">Number of chairs</label><input id="ch" name="clinic[chairs]" type="number" min="1" max="20" class="inp" value="{{ old('clinic.chairs', 2) }}" required></div>
+        <div class="field full">
+          <span class="lbl">Clinic logo (optional)</span>
+          <div class="logo-up" data-logo>
+            <button type="button" class="logo-box" data-logo-pick aria-label="Upload clinic logo">@if (old('clinic.logo'))<img src="{{ old('clinic.logo') }}" alt="Clinic logo">@else<span>+ Logo</span>@endif</button>
+            <input type="hidden" name="clinic[logo]" value="{{ old('clinic.logo') }}" data-logo-value>
+            <div class="hint">PNG or JPG. Printed on bills and shown in the menu.<br><button type="button" class="linkbtn {{ old('clinic.logo') ? '' : 'hide' }}" data-logo-clear>Remove logo</button></div>
+          </div>
+        </div>
       </div>
     </section>
     <section class="card">
@@ -25,10 +33,11 @@
     </section>
     <section class="card">
       <h2>3. Doctor</h2>
+      <p class="hint" style="margin-top:-6px">This is the owner doctor, who can also change clinic settings and the logo. The admin and doctor can use the same mobile number; each just needs their own username.</p>
       @include('partials.person', ['p' => 'doctor'])
       <div class="form" style="margin-top:14px">
-        <div class="field"><label for="dq">Qualification</label><input id="dq" name="doctor[qualification]" class="inp" placeholder="BDS, MDS" value="{{ old('doctor.qualification') }}" required></div>
-        <div class="field"><label for="dr">Dental council registration no.</label><input id="dr" name="doctor[reg_no]" class="inp mono" value="{{ old('doctor.reg_no') }}" required></div>
+        <div class="field"><label for="dq">Qualification (optional)</label><input id="dq" name="doctor[qualification]" class="inp" placeholder="BDS, MDS" value="{{ old('doctor.qualification') }}"></div>
+        <div class="field"><label for="dr">Dental council registration no. (optional)</label><input id="dr" name="doctor[reg_no]" class="inp mono" value="{{ old('doctor.reg_no') }}"></div>
         <div class="field"><label for="ds">Specialisation</label><select id="ds" name="doctor[specialisation]" class="inp">@foreach (['General Dentist', 'Endodontist', 'Orthodontist', 'Periodontist', 'Prosthodontist', 'Oral Surgeon', 'Pedodontist'] as $s)<option @selected(old('doctor.specialisation') === $s)>{{ $s }}</option>@endforeach</select></div>
         <div class="field"><label for="de">Email</label><input id="de" name="doctor[email]" type="email" class="inp" value="{{ old('doctor.email') }}"></div>
       </div>

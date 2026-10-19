@@ -41,7 +41,11 @@ class Pages
         }
         $chosen = $user->pages ? json_decode($user->pages, true) : null;
         if (! is_array($chosen)) {
-            return self::defaults($user->role);
+            $keys = self::defaults($user->role);
+            if ($user->is_owner) {
+                $keys[] = 'settings';
+            }
+            return array_values(array_intersect(array_keys(self::PAGES), $keys));
         }
         return array_values(array_filter(array_keys(self::PAGES), fn ($k) => in_array($k, $chosen, true)));
     }

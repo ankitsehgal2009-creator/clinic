@@ -20,16 +20,16 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        if (User::where('mobile', '9820077134')->exists()) {
+        if (User::where('username', 'vikram')->exists()) {
             $this->command->info('Demo clinic already exists.');
             return;
         }
         $c = Clinic::create(['name' => 'Smile Craft Dental Clinic', 'address' => 'Shop 4, Sea Breeze CHS, Lokhandwala Road, Andheri West', 'city' => 'Mumbai 400053', 'phone' => '022 2632 4410', 'gstin' => '27AAKFS4821M1Z6', 'patient_prefix' => 'SC-', 'invoice_prefix' => 'SC']);
         TreatmentPrice::seedDefaults($c->id);
         $chairs = collect([1, 2, 3])->map(fn ($n) => Chair::create(['clinic_id' => $c->id, 'name' => "Chair $n"]));
-        $admin = User::create(['clinic_id' => $c->id, 'name' => 'Vikram Mehta', 'mobile' => '9820077134', 'role' => 'ADMIN', 'password' => 'demo1234']);
-        $doc = User::create(['clinic_id' => $c->id, 'name' => 'Dr. Ananya Kulkarni', 'mobile' => '9819022417', 'role' => 'DOCTOR', 'password' => 'demo1234', 'qualification' => 'BDS, MDS (Endodontics)', 'reg_no' => 'A-28417', 'specialisation' => 'Endodontist']);
-        User::create(['clinic_id' => $c->id, 'name' => 'Priya Shinde', 'mobile' => '9004018822', 'role' => 'RECEPTIONIST', 'password' => 'demo1234']);
+        $admin = User::create(['clinic_id' => $c->id, 'name' => 'Vikram Mehta', 'username' => 'vikram', 'mobile' => '9820077134', 'role' => 'ADMIN', 'password' => 'demo1234']);
+        $doc = User::create(['clinic_id' => $c->id, 'name' => 'Dr. Ananya Kulkarni', 'username' => 'ananya', 'mobile' => '9819022417', 'role' => 'DOCTOR', 'is_owner' => true, 'password' => 'demo1234', 'qualification' => 'BDS, MDS (Endodontics)', 'reg_no' => 'A-28417', 'specialisation' => 'Endodontist']);
+        User::create(['clinic_id' => $c->id, 'name' => 'Priya Shinde', 'username' => 'priya', 'mobile' => '9004018822', 'role' => 'RECEPTIONIST', 'password' => 'demo1234']);
         $people = [
             ['Rohan Deshpande', '9820145567', 'Male', '1992-03-12', 'FATHER', 'Suresh Deshpande'],
             ['Meera Iyer', '9930021456', 'Female', '1997-10-21', 'HUSBAND', 'Karthik Iyer'],
@@ -65,6 +65,6 @@ class DatabaseSeeder extends Seeder
             }
         }
         Activity::log($admin, 'Created demo clinic');
-        $this->command->info('Demo clinic ready. Sign in with 9820077134 (admin), 9819022417 (doctor) or 9004018822 (receptionist), password demo1234.');
+        $this->command->info('Demo clinic ready. Sign in as vikram (admin), ananya (doctor) or priya (receptionist), password demo1234. Mobile numbers work too.');
     }
 }

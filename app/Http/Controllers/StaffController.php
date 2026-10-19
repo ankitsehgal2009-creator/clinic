@@ -23,6 +23,7 @@ class StaffController extends Controller
         abort_unless($me->isAdmin(), 403, 'Only the admin can add staff.');
         $v = $r->validate([
             'name' => 'required|string|min:2|max:100',
+            'username' => ['required', self::usernameRule()],
             'mobile' => ['required', self::mobileRule()],
             'role' => 'required|in:DOCTOR,RECEPTIONIST,ASSISTANT',
             'password' => 'required|string|min:6',
@@ -30,13 +31,13 @@ class StaffController extends Controller
             'reg_no' => 'nullable|string|max:50',
             'photo' => 'nullable|string|max:200000',
         ], ['password.min' => 'Passwords need at least 6 characters.']);
-        $mobile = Fmt::mobile($v['mobile']);
-        if (User::where('mobile', $mobile)->exists()) {
-            return back()->withInput()->with('error', 'That mobile number already has an account.');
+        $username = User::cleanUsername($v['username']);
+        if (User::where('username', $username)->exists()) {
+            return back()->withInput()->with('error', "The username \"$username\" is already taken. Choose another one.");
         }
-        User::create(['clinic_id' => $me->clinic_id, ...$v, 'mobile' => $mobile]);
-        Activity::log($me, 'Added staff member', $v['name'].' · '.Pages::ROLE_LABEL[$v['role']]);
-        return back()->with('ok', "{$v['name']} can now sign in with $mobile.");
+        User::create(['clinic_id' => $me->clinic_id, ...$v, 'username' => $username, 'mobile' => Fmt::mobile($v['mobile'])]);
+        Activity::log($me, 'Added staff member', $v['name'].' · '.Pages::ROLE_LABEL[$v['role']].' · '.$username);
+        return back()->with('ok', "{$v['name']} can now sign in with the username $username.");
     }
 
     public function active(Request $r, User $user)

@@ -39,6 +39,18 @@
     return fetch(url, { headers: { Accept: 'application/json' } }).then(function (r) { if (!r.ok) throw new Error('Could not load. Check your connection.'); return r.json(); });
   }
 
+  // ---------- Small note in the corner: "Saved" after an automatic save, or what went wrong ----------
+  var toastBox = null;
+  function toast(msg, bad) {
+    if (!toastBox) { toastBox = el('div', { class: 'toasts', role: 'status', 'aria-live': 'polite' }); document.body.appendChild(toastBox); }
+    var t = el('div', { class: 'toast' + (bad ? ' bad' : '') },
+      '<span class="ti">' + (bad ? '!' : '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>') + '</span>' + esc(msg));
+    toastBox.appendChild(t);
+    while (toastBox.children.length > 3) toastBox.removeChild(toastBox.firstChild);
+    setTimeout(function () { t.classList.add('out'); setTimeout(function () { t.remove(); }, 320); }, bad ? 5000 : 2200);
+  }
+  window.smileToast = toast;
+
   // ---------- Date picker: month calendar in a popover; dates with appointments are bold ----------
   function datePicker(host, opts) {
     var value = opts.value || '';
@@ -344,27 +356,30 @@
     var before = s.value;
     s.addEventListener('change', function () {
       s.disabled = true;
-      send('POST', s.dataset.status, { status: s.value }).then(function () { before = s.value; s.disabled = false; })
-        .catch(function (e) { alert(e.message); s.value = before; s.disabled = false; });
+      send('POST', s.dataset.status, { status: s.value }).then(function () { before = s.value; s.disabled = false; toast('Status saved'); })
+        .catch(function (e) { toast(e.message, true); s.value = before; s.disabled = false; });
     });
   });
+
+  function pulse(b) { b.classList.remove('pulse'); void b.offsetWidth; b.classList.add('pulse'); }
 
   $$('[data-toggle]').forEach(function (b) {
     b.addEventListener('click', function () {
       var on = !b.classList.contains('on');
-      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); pulse(b);
       var tr = b.closest('tr'); if (tr) tr.classList.toggle('off', !on);
-      send('POST', b.dataset.toggle, { active: on }).catch(function (e) {
-        alert(e.message); b.classList.toggle('on', !on); b.setAttribute('aria-pressed', !on); if (tr) tr.classList.toggle('off', on);
+      send('POST', b.dataset.toggle, { active: on }).then(function () { toast(on ? 'Turned on · saved' : 'Turned off · saved'); }).catch(function (e) {
+        toast(e.message, true); b.classList.toggle('on', !on); b.setAttribute('aria-pressed', !on); if (tr) tr.classList.toggle('off', on);
       });
     });
   });
 
   $$('[data-page]').forEach(function (b) {
     b.addEventListener('click', function () {
-      b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on'));
+      b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on')); pulse(b);
       var pages = $$('[data-person="' + b.dataset.person + '"].on').map(function (x) { return x.dataset.page; });
-      send('POST', b.dataset.pagesUrl, { pages: pages }).catch(function (e) { alert(e.message); b.classList.toggle('on'); });
+      send('POST', b.dataset.pagesUrl, { pages: pages }).then(function () { toast('Page access saved'); })
+        .catch(function (e) { toast(e.message, true); b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on')); });
     });
   });
 
@@ -400,7 +415,7 @@
   var addRec = $('[data-add-rec]');
   if (addRec) addRec.addEventListener('click', function () {
     var box = $('[data-recs]'), recs = $$('.rec', box), copy = recs[recs.length - 1].cloneNode(true), n = recs.length;
-    $$('input', copy).forEach(function (i) { i.value = ''; i.name = i.name.replace(/receptionists\[\d+\]/, 'receptionists[' + n + ']'); });
+    $$('input', copy).forEach(function (i) { i.value = ''; delete i.dataset.touched; i.name = i.name.replace(/receptionists\[\d+\]/, 'receptionists[' + n + ']'); });
     $('[data-photo]', copy).textContent = '+';
     box.appendChild(copy);
   });
@@ -526,4 +541,179 @@
     });
     done.addEventListener('click', function (e) { if (e.target.closest('[data-again]')) { sheet = null; step('pick'); } });
   })();
+
+  // ---------- Usernames: suggested from the first name until the person types their own ----------
+  function slug(name) {
+    var first = name.trim().replace(/^dr\.?\s+/i, '').split(/\s+/)[0] || '';
+    return first.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24);
+  }
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.matches('[data-username]')) {
+      t.dataset.touched = t.value ? '1' : '';
+      var clean = t.value.toLowerCase().replace(/[^a-z0-9._]/g, '');
+      if (clean !== t.value) t.value = clean;
+      return;
+    }
+    if (!t.matches('[data-name-src]')) return;
+    var u = $('[data-username]', t.closest('.form'));
+    if (u && !u.dataset.touched) u.value = slug(t.value);
+  });
+
+  // ---------- Clinic logo: shrink to at most 480x240 and keep PNG transparency ----------
+  $$('[data-logo]').forEach(function (box) {
+    var pickBtn = $('[data-logo-pick]', box), value = $('[data-logo-value]', box), clear = $('[data-logo-clear]', box), saveUrl = box.dataset.logoSave;
+    function show(url) {
+      pickBtn.innerHTML = url ? '<img src="' + url + '" alt="Clinic logo">' : '<span>+ Logo</span>';
+      if (clear) clear.classList.toggle('hide', !url);
+    }
+    function store(url) {
+      if (value) { value.value = url; show(url); return; }
+      if (!saveUrl) return;
+      pickBtn.classList.add('saving');
+      send('POST', saveUrl, { logo: url }).then(function () {
+        show(url); toast(url ? 'Logo saved' : 'Logo removed');
+        $$('.side .brand .logo').forEach(function (l) {
+          l.className = url ? 'logo img' : 'logo'; l.innerHTML = url ? '<img src="' + url + '" alt="">' : 'S';
+        });
+      }).catch(function (e) { toast(e.message, true); }).then(function () { pickBtn.classList.remove('saving'); });
+    }
+    pickBtn.addEventListener('click', function () {
+      var input = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp' });
+      input.addEventListener('change', function () {
+        var f = input.files[0];
+        if (!f) return;
+        var img = new Image();
+        img.onload = function () {
+          var k = Math.min(1, 480 / img.width, 240 / img.height), c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          var url = f.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.88) : c.toDataURL('image/png');
+          URL.revokeObjectURL(img.src);
+          if (url.length > 390000) url = c.toDataURL('image/jpeg', 0.85);
+          store(url);
+        };
+        img.onerror = function () { toast('That picture could not be read. Try a PNG or JPG file.', true); };
+        img.src = URL.createObjectURL(f);
+      });
+      input.click();
+    });
+    if (clear) clear.addEventListener('click', function () { store(''); });
+  });
+
+  // ---------- Settings save by themselves when a field changes ----------
+  $$('form[data-autosave]').forEach(function (form) {
+    var timer;
+    function data() { var o = {}; new FormData(form).forEach(function (v, k) { if (k !== '_token') o[k] = v; }); return o; }
+    form.addEventListener('submit', function (e) { e.preventDefault(); });
+    form.addEventListener('change', function (e) {
+      var field = e.target.closest('.field');
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        if (field) field.classList.add('saving');
+        send('POST', form.action, data()).then(function () {
+          toast('Settings saved');
+          if (e.target.id === 'name') $$('.side .brand span').forEach(function (s) { s.textContent = e.target.value; });
+        }).catch(function (err) { toast(err.message, true); })
+          .then(function () { if (field) field.classList.remove('saving'); });
+      }, 250);
+    });
+  });
+
+  // ---------- My appearance: change the look straight away and save it ----------
+  var look = $('[data-appearance]');
+  if (look) {
+    look.addEventListener('submit', function (e) { e.preventDefault(); });
+    look.addEventListener('change', function () {
+      var o = {}, root = document.documentElement;
+      new FormData(look).forEach(function (v, k) { o[k] = v; });
+      root.classList.add('theming');
+      Object.keys(o).forEach(function (k) { root.dataset[k] = o[k]; });
+      setTimeout(function () { root.classList.remove('theming'); }, 450);
+      send('POST', look.dataset.save, o).then(function () { toast('Appearance saved'); }).catch(function (e) { toast(e.message, true); });
+    });
+  }
+  $$('[data-demo-toggle]').forEach(function (b) {
+    b.addEventListener('click', function () { b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on')); pulse(b); });
+  });
+
+  // ---------- Login: show password, busy button, rotating feature line ----------
+  var eye = $('[data-eye]');
+  if (eye) eye.addEventListener('click', function () {
+    var pw = $('#password'), show = pw.type === 'password';
+    pw.type = show ? 'text' : 'password';
+    eye.setAttribute('aria-pressed', show); eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    pw.focus();
+  });
+  var loginForm = $('[data-login]');
+  if (loginForm) loginForm.addEventListener('submit', function () { var b = $('[data-login-btn]'); b.classList.add('busy'); b.disabled = true; });
+  $$('[data-rotate]').forEach(function (span) {
+    var words = span.dataset.rotate.split('|'), i = 0;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    setInterval(function () {
+      span.classList.add('swap');
+      setTimeout(function () { i = (i + 1) % words.length; span.textContent = words[i]; span.classList.remove('swap'); }, 350);
+    }, 2600);
+  });
+
+  // ---------- Print with options: paper size, orientation, margins and fit to one page ----------
+  var PAPER = { A4: [210, 297], A5: [148, 210], Letter: [216, 279] };
+  var MARGIN = { normal: 12, narrow: 6, none: 0 };
+  function printOpts() {
+    try { return JSON.parse(localStorage.getItem('sd-print') || '') || {}; } catch (e) { return {}; }
+  }
+  function printWith(target, o) {
+    var size = PAPER[o.paper] || PAPER.A4, land = o.orient === 'landscape', m = MARGIN[o.margin] != null ? MARGIN[o.margin] : 12;
+    var wMm = (land ? size[1] : size[0]) - 2 * m, hMm = (land ? size[0] : size[1]) - 2 * m, px = 96 / 25.4;
+    var zoom = 1;
+    if (o.scale === 'fit' || o.scale === 'width') {
+      target.classList.add('measure'); target.style.width = Math.floor(wMm * px) + 'px';
+      var h = target.scrollHeight;
+      target.classList.remove('measure'); target.style.width = '';
+      if (o.scale === 'fit') zoom = Math.min(1, (hMm * px * 0.97) / Math.max(h, 1));
+    } else zoom = (+o.scale || 100) / 100;
+    var st = $('#sd-page') || document.head.appendChild(el('style', { id: 'sd-page' }));
+    st.textContent = '@page{size:' + (o.paper || 'A4') + ' ' + (land ? 'landscape' : 'portrait') + ';margin:' + m + 'mm}';
+    document.documentElement.style.setProperty('--pz', zoom.toFixed(3));
+    return zoom;
+  }
+  $$('[data-print]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = $(btn.dataset.print), o = printOpts();
+      o = { paper: o.paper || 'A4', orient: o.orient || 'portrait', margin: o.margin || 'normal', scale: o.scale || 'fit' };
+      var sel = function (name, label, opts) {
+        return '<div class="field"><label>' + label + '</label><select class="inp" name="' + name + '">' + opts.map(function (x) {
+          return '<option value="' + x[0] + '"' + (o[name] === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>';
+      };
+      var m = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Print options' },
+        '<form class="dlg"><h2>Print</h2><div class="form">' +
+        sel('paper', 'Paper', [['A4', 'A4'], ['A5', 'A5'], ['Letter', 'Letter']]) +
+        sel('orient', 'Orientation', [['portrait', 'Portrait'], ['landscape', 'Landscape']]) +
+        sel('scale', 'Size', [['fit', 'Fit to one page'], ['width', 'Fit to page width'], ['100', 'Actual size (100%)'], ['90', '90%'], ['80', '80%'], ['70', '70%'], ['60', '60%']]) +
+        sel('margin', 'Margins', [['normal', 'Normal'], ['narrow', 'Narrow'], ['none', 'None']]) +
+        '</div><div class="pfit" data-fit></div><p class="hint">In the next window, keep Scale at Default and turn off Headers and footers for a clean page.</p>' +
+        '<div class="row" style="justify-content:flex-end;margin-top:6px"><button type="button" class="btn" data-x>Cancel</button><button class="btn pri">Print</button></div></form>');
+      document.body.appendChild(m);
+      var form = $('form', m);
+      function read() { new FormData(form).forEach(function (v, k) { o[k] = v; }); }
+      function info() {
+        read();
+        var z = printWith(target, o);
+        $('[data-fit]', m).textContent = (o.paper + ' ' + o.orient) + ' · printed at ' + Math.round(z * 100) + '%' + (o.scale === 'fit' ? ', fits on one page' : '');
+      }
+      function close() { m.remove(); btn.focus(); }
+      form.addEventListener('change', info);
+      form.addEventListener('submit', function (e) {
+        e.preventDefault(); read();
+        try { localStorage.setItem('sd-print', JSON.stringify(o)); } catch (err) {}
+        printWith(target, o); m.remove();
+        setTimeout(function () { window.print(); }, 50);
+      });
+      $('[data-x]', m).addEventListener('click', close);
+      m.addEventListener('click', function (e) { if (e.target === m) close(); });
+      m.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+      info();
+      $('select', m).focus();
+    });
+  });
 })();

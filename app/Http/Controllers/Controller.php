@@ -28,4 +28,24 @@ abstract class Controller
             }
         };
     }
+
+    /** Username rule: 3 to 30 letters, digits, dots or underscores. */
+    protected static function usernameRule(): \Closure
+    {
+        return function ($attr, $value, $fail) {
+            if (! User::cleanUsername($value)) {
+                $fail('Usernames need 3 to 30 letters or numbers, with no spaces (a dot or _ is fine), like priya or dr.mehta.');
+            }
+        };
+    }
+
+    /** A small picture sent from the browser as a PNG, JPEG or WebP data URL. */
+    protected static function imageRule(): \Closure
+    {
+        return function ($attr, $value, $fail) {
+            if ($value && ! preg_match('#^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$#', $value)) {
+                $fail('That picture could not be read. Try a PNG or JPG file.');
+            }
+        };
+    }
 }
