@@ -18,9 +18,9 @@ Route::get('/', fn () => redirect(auth()->check() ? auth()->user()->homeUrl() : 
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::get('/setup', [AuthController::class, 'showSetup'])->name('setup');
-    Route::post('/setup', [AuthController::class, 'setup'])->middleware('throttle:5,1');
+    Route::post('/setup', [AuthController::class, 'setup'])->middleware('throttle:setup');
 });
 
 Route::middleware(['auth', 'page'])->group(function () {

@@ -88,6 +88,8 @@ php artisan migrate --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
 
+After the October 2026 update (usernames), everyone already set up gets a username made from their first name, for example `vikram` or `ananya`. The Staff page shows each person's username. Mobile numbers still work for signing in as long as only one person uses that number.
+
 ## If something goes wrong
 
 - **"500 Server Error":** open `storage/logs` in File Manager and send the newest log file. Also check that the `storage` and `bootstrap/cache` folders have permission 755.
