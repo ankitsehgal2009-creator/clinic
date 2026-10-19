@@ -14,6 +14,10 @@ class SettingsController extends Controller
         return view('settings', [
             'c' => $me->clinic,
             'chairs' => Chair::where('clinic_id', $me->clinic_id)->where('active', true)->count(),
+            'sample' => ['pt' => (object) ['name' => 'Rohan Deshpande', 'age' => 34, 'gender' => 'Male', 'code' => $me->clinic->patient_prefix.'0142'],
+        'v' => ['date' => \App\Support\Fmt::today(), 'complaint' => 'Follow-up for root canal', 'teeth' => '36', 'procedure' => 'RCT sitting 2', 'diagnosis' => 'Irreversible pulpitis', 'advice' => 'Avoid chewing hard food on the treated side until the crown is fitted.', 'next_visit' => date('Y-m-d', strtotime('+7 days'))],
+        'meds' => [['name' => 'Amoxicillin 500 mg', 'form' => 'Capsule', 'dose' => '1-1-1', 'timing' => 'After food', 'days' => '5 days'], ['name' => 'Ibuprofen 400 mg + Paracetamol 325 mg', 'form' => 'Tablet', 'dose' => '1-0-1', 'timing' => 'After food', 'days' => '3 days'], ['name' => 'Chlorhexidine 0.2%', 'form' => 'Mouthwash', 'dose' => '10 ml twice', 'timing' => 'After brushing', 'days' => '7 days']]],
+            'doc' => \App\Models\User::where(['clinic_id' => $me->clinic_id, 'role' => 'DOCTOR'])->orderByDesc('is_owner')->first(),
         ]);
     }
 
@@ -31,6 +35,7 @@ class SettingsController extends Controller
             'morning_open' => $time, 'morning_close' => $time, 'evening_open' => $time, 'evening_close' => $time,
             'chairs' => 'required|integer|min:1|max:20',
             'invoice_prefix' => 'required|alpha_num|max:8',
+            'rx_design' => 'nullable|in:'.implode(',', array_keys(\App\Support\Rx::DESIGNS)),
         ], ['gstin.regex' => 'GSTIN should be 15 characters, like 27AAKFS4821M1Z6.']);
         $min = fn ($t) => (int) substr($t, 0, 2) * 60 + (int) substr($t, 3, 2);
         [$mo, $mc, $eo, $ec] = array_map($min, [$v['morning_open'], $v['morning_close'], $v['evening_open'], $v['evening_close']]);
@@ -41,6 +46,7 @@ class SettingsController extends Controller
         $me->clinic->update([
             'name' => $v['name'], 'address' => $v['address'], 'city' => $v['city'], 'phone' => $v['phone'],
             'gstin' => $v['gstin'] ? strtoupper($v['gstin']) : null, 'invoice_prefix' => strtoupper($v['invoice_prefix']),
+            'rx_design' => $v['rx_design'] ?? $me->clinic->rx_design,
             'morning_open' => $mo, 'morning_close' => $mc, 'evening_open' => $eo, 'evening_close' => $ec,
         ]);
         $have = Chair::where('clinic_id', $me->clinic_id)->orderBy('id')->get();

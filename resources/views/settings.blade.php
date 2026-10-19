@@ -31,6 +31,17 @@
           <div class="field"><label for="{{ $k }}">{{ $l }}</label><select id="{{ $k }}" name="{{ $k }}" class="inp">@foreach ($times as $t)<option value="{{ $t }}" @selected(old($k, $hhmm($c->$k)) === $t)>{{ \App\Support\Fmt::time((int) substr($t, 0, 2) * 60 + (int) substr($t, 3)) }}</option>@endforeach</select></div>
         @endforeach
       </div>
+      <h2 style="margin-top:22px">Prescription design</h2>
+      <p class="hint" style="margin-top:-6px">Used for every new prescription. The doctor can still pick another design for one print.</p>
+      <div class="rxd" role="radiogroup" aria-label="Prescription design">
+        @foreach (\App\Support\Rx::DESIGNS as $k => [$n, $why])
+          <label class="rxd-card">
+            <input type="radio" name="rx_design" value="{{ $k }}" @checked($c->rx_design === $k)>
+            <div class="thumb">@include('rx.paper', ['d' => $k, 'doc' => $doc, 'pt' => $sample['pt'], 'v' => $sample['v'], 'meds' => $sample['meds']])</div>
+            <b>{{ $n }}</b><small class="muted">{{ $why }}</small>
+          </label>
+        @endforeach
+      </div>
       @unless ($ro)<noscript><div style="margin-top:16px"><button class="btn pri">Save</button></div></noscript>@endunless
     </fieldset>
   </form>

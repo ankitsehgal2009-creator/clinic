@@ -11,7 +11,7 @@
   @forelse ($rows as $r)
     <tr>
       <td class="mono" style="white-space:nowrap">{{ $r->created_at->format('d M, h:i A') }}</td>
-      <td><div class="who">@include('partials.avatar', ['name' => $r->user->name, 'photo' => $r->user->photo])<div><b>{{ $r->user->name }}</b><small>{{ $r->user->roleLabel() }}</small></div></div></td>
+      <td>@if ($r->user)<div class="who">@include('partials.avatar', ['name' => $r->user->name, 'photo' => $r->user->photo])<div><b>{{ $r->user->name }}</b><small>{{ $r->user->roleLabel() }}</small></div></div>@else<div class="who">@include('partials.avatar', ['name' => 'Online'])<div><b>Online booking</b><small>Patient</small></div></div>@endif</td>
       <td @if (str_starts_with($r->action, 'Deleted')) style="color:var(--bad)" @endif>{{ $r->action }}</td>
       <td class="muted">{{ $r->details }}</td>
     </tr>

@@ -13,6 +13,9 @@ use App\Models\TreatmentPrice;
 use App\Models\User;
 use App\Support\Fmt;
 use App\Support\Money;
+use App\Support\Rx;
+use App\Models\ToothMark;
+use App\Models\Visit;
 use Illuminate\Database\Seeder;
 
 /** Demo clinic for trying the app. Run: php artisan db:seed */
@@ -26,6 +29,8 @@ class DatabaseSeeder extends Seeder
         }
         $c = Clinic::create(['name' => 'Smile Craft Dental Clinic', 'address' => 'Shop 4, Sea Breeze CHS, Lokhandwala Road, Andheri West', 'city' => 'Mumbai 400053', 'phone' => '022 2632 4410', 'gstin' => '27AAKFS4821M1Z6', 'patient_prefix' => 'SC-', 'invoice_prefix' => 'SC']);
         TreatmentPrice::seedDefaults($c->id);
+        Rx::seedTemplates($c->id);
+        $c->update(['booking_slug' => 'smilecraft', 'booking_on' => true]);
         $chairs = collect([1, 2, 3])->map(fn ($n) => Chair::create(['clinic_id' => $c->id, 'name' => "Chair $n"]));
         $admin = User::create(['clinic_id' => $c->id, 'name' => 'Vikram Mehta', 'username' => 'vikram', 'mobile' => '9820077134', 'role' => 'ADMIN', 'password' => 'demo1234']);
         $doc = User::create(['clinic_id' => $c->id, 'name' => 'Dr. Ananya Kulkarni', 'username' => 'ananya', 'mobile' => '9819022417', 'role' => 'DOCTOR', 'is_owner' => true, 'password' => 'demo1234', 'qualification' => 'BDS, MDS (Endodontics)', 'reg_no' => 'A-28417', 'specialisation' => 'Endodontist']);
@@ -63,6 +68,19 @@ class DatabaseSeeder extends Seeder
                 Payment::create(['clinic_id' => $c->id, 'invoice_id' => $inv->id, 'patient_id' => $pts[$p]->id, 'date' => $today, 'mode' => $pay[0], 'amount' => $pay[1] * 100, 'received_by' => $doc->id]);
                 $inv->syncPaid();
             }
+        }
+        // Rohan's root canal on 36: two visits, and his tooth chart.
+        $tpl = \App\Models\RxTemplate::where('clinic_id', $c->id)->where('name', 'Post RCT')->first();
+        foreach ([[-7, 'Pain in lower left back tooth', 'Access opening, working length taken', 'Irreversible pulpitis'], [0, 'Follow-up for root canal', 'RCT sitting 2: cleaning and shaping', 'Irreversible pulpitis, RCT in progress']] as [$ago, $cc, $proc, $dx]) {
+            $v = Visit::create([
+                'clinic_id' => $c->id, 'patient_id' => $pts[0]->id, 'doctor_id' => $doc->id, 'date' => date('Y-m-d', strtotime("$today $ago days")),
+                'complaint' => $cc, 'teeth' => '36', 'procedure' => $proc, 'diagnosis' => $dx, 'findings' => 'Tender on percussion. Canals MB, ML, D located.',
+                'advice' => $tpl->advice, 'next_visit' => date('Y-m-d', strtotime("$today +7 days")), 'design' => 'classic', 'rx_template_id' => $tpl->id, 'created_by' => $doc->id,
+            ]);
+            $v->medicines()->createMany($tpl->meds);
+        }
+        foreach ([36 => ['rct', 'Root canal in progress, sitting 2 done.'], 46 => ['filled', 'Composite filling, 2024.'], 18 => ['missing', 'Wisdom tooth taken out in 2019.'], 37 => ['caries', 'Small decay on the biting surface.'], 26 => ['crown', null], 47 => ['planned', 'Deep scaling and filling planned.']] as $n => [$st, $note]) {
+            ToothMark::create(['clinic_id' => $c->id, 'patient_id' => $pts[0]->id, 'tooth' => $n, 'state' => $st, 'note' => $note, 'updated_by' => $doc->id]);
         }
         Activity::log($admin, 'Created demo clinic');
         $this->command->info('Demo clinic ready. Sign in as vikram (admin), ananya (doctor) or priya (receptionist), password demo1234. Mobile numbers work too.');

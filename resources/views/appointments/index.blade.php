@@ -30,7 +30,7 @@
     <tr class="{{ $a->status === 'CANCELLED' ? 'off' : '' }}">
       <td class="mono">{{ Fmt::time($a->start_min) }}</td>
       <td><a href="{{ route('patients.show', $a->patient_id) }}"><b>{{ $a->patient->name }}</b></a><br><small class="mono muted">{{ $a->patient->code }}</small></td>
-      <td>{{ $a->treatment ?? '—' }}@if ($a->doctor)<br><small class="muted">{{ $a->doctor->name }}</small>@endif</td>
+      <td>{{ $a->treatment ?? '—' }}@if ($a->source === 'ONLINE') <span class="chip c-acc">Online</span>@endif @if ($a->doctor)<br><small class="muted">{{ $a->doctor->name }}</small>@endif</td>
       <td>{{ $a->chair?->name ?? '—' }}</td>
       <td>
         <div class="row" style="flex-wrap:nowrap">

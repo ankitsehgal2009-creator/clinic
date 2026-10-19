@@ -6,15 +6,23 @@ use App\Http\Controllers\AppearanceController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CashController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\PatientController;
+use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\ToothController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect(auth()->check() ? auth()->user()->homeUrl() : '/login'));
+
+// Public booking page for patients: no login. Only free times are shown, never other patients' names.
+Route::get('/book/{slug}', [BookingController::class, 'page'])->name('book.page');
+Route::get('/book/{slug}/slots', [BookingController::class, 'freeSlots'])->name('book.slots');
+Route::post('/book/{slug}', [BookingController::class, 'book'])->middleware('throttle:booking')->name('book.store');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -73,6 +81,34 @@ Route::middleware(['auth', 'page'])->group(function () {
         Route::delete('/billing/{invoice}', [BillingController::class, 'destroy'])->name('billing.destroy');
         Route::delete('/payments/{payment}', [BillingController::class, 'unpay'])->name('payments.destroy');
         Route::get('/api/billing/patients', [ApiController::class, 'search']);
+    });
+
+    Route::middleware('page:prescriptions')->group(function () {
+        Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('rx.index');
+        Route::get('/prescriptions/new', [PrescriptionController::class, 'create'])->name('rx.create');
+        Route::post('/prescriptions', [PrescriptionController::class, 'store'])->name('rx.store');
+        Route::get('/prescriptions/templates', [PrescriptionController::class, 'templates'])->name('rx.templates');
+        Route::post('/prescriptions/templates', [PrescriptionController::class, 'saveTemplate'])->name('rx.templates.store');
+        Route::post('/prescriptions/templates/{template}', [PrescriptionController::class, 'saveTemplate'])->name('rx.templates.update');
+        Route::post('/prescriptions/templates/{template}/active', [PrescriptionController::class, 'templateActive'])->name('rx.templates.active');
+        Route::post('/prescriptions/templates/{template}/default', [PrescriptionController::class, 'templateDefault'])->name('rx.templates.default');
+        Route::delete('/prescriptions/templates/{template}', [PrescriptionController::class, 'destroyTemplate'])->name('rx.templates.destroy');
+        Route::get('/prescriptions/{visit}', [PrescriptionController::class, 'show'])->whereNumber('visit')->name('rx.show');
+        Route::get('/prescriptions/{visit}/edit', [PrescriptionController::class, 'edit'])->name('rx.edit');
+        Route::post('/prescriptions/{visit}', [PrescriptionController::class, 'update'])->name('rx.update');
+        Route::get('/api/rx/patients', [ApiController::class, 'search']);
+    });
+
+    Route::middleware('page:teeth')->group(function () {
+        Route::get('/tooth-chart', [ToothController::class, 'index'])->name('teeth.index');
+        Route::post('/tooth-chart/{patient}', [ToothController::class, 'save'])->name('teeth.save');
+        Route::get('/api/teeth/patients', [ApiController::class, 'search']);
+    });
+
+    Route::middleware('page:booking')->group(function () {
+        Route::get('/online-booking', [BookingController::class, 'index'])->name('booking.index');
+        Route::post('/online-booking', [BookingController::class, 'save'])->name('booking.save');
+        Route::get('/api/booking/slots', [ApiController::class, 'slots']);
     });
 
     Route::middleware('page:cash')->group(function () {

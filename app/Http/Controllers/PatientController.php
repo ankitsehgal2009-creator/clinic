@@ -103,6 +103,8 @@ class PatientController extends Controller
             'appts' => $patient->appointments()->with('chair', 'doctor')->orderByDesc('date')->orderByDesc('start_min')->limit(50)->get(),
             'bills' => $this->me()->canOpen('billing') ? $patient->invoices()->orderByDesc('date')->orderByDesc('id')->limit(50)->get() : null,
             'balance' => $patient->balance(),
+            'visits' => $this->me()->canOpen('prescriptions') ? \App\Models\Visit::with('doctor:id,name')->where('patient_id', $patient->id)->orderByDesc('date')->orderByDesc('id')->limit(50)->get() : null,
+            'chart' => $this->me()->canOpen('teeth') ? ToothController::chartData($patient, $this->me()) : null,
             'family' => Patient::where('clinic_id', $patient->clinic_id)->where('mobile', $patient->mobile)->whereKeyNot($patient->id)->get(['id', 'name', 'code']),
         ]);
     }
@@ -122,6 +124,8 @@ class PatientController extends Controller
         DB::transaction(function () use ($patient) {
             $patient->appointments()->delete();
             $patient->invoices()->delete(); // payments go with their bills
+            \App\Models\Visit::where('patient_id', $patient->id)->delete(); // medicines go with their visits
+            \App\Models\ToothMark::where('patient_id', $patient->id)->delete();
             $patient->delete();
         });
         Activity::log($this->me(), 'Deleted patient permanently', "$patient->name · $patient->code");

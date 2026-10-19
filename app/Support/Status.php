@@ -5,6 +5,7 @@ namespace App\Support;
 class Status
 {
     public const STATUS = [
+        'REQUESTED' => ['label' => 'Requested online', 'cls' => 'c-acc'],
         'BOOKED' => ['label' => 'Booked', 'cls' => 'c-pri'],
         'WAITING' => ['label' => 'Waiting', 'cls' => 'c-warn'],
         'IN_CHAIR' => ['label' => 'In chair', 'cls' => 'c-info'],

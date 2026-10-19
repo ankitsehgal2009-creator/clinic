@@ -11,16 +11,19 @@ class Pages
         'dashboard' => ['label' => 'Dashboard', 'route' => 'dashboard', 'roles' => ['DOCTOR', 'RECEPTIONIST', 'ASSISTANT']],
         'appointments' => ['label' => 'Appointments', 'route' => 'appointments.index', 'roles' => ['DOCTOR', 'RECEPTIONIST', 'ASSISTANT']],
         'patients' => ['label' => 'Patients', 'route' => 'patients.index', 'roles' => ['DOCTOR', 'RECEPTIONIST', 'ASSISTANT']],
+        'prescriptions' => ['label' => 'Prescriptions', 'route' => 'rx.index', 'roles' => ['DOCTOR']],
+        'teeth' => ['label' => 'Tooth chart', 'route' => 'teeth.index', 'roles' => ['DOCTOR', 'ASSISTANT']],
         'billing' => ['label' => 'Billing & GST', 'route' => 'billing.index', 'roles' => ['DOCTOR']],
         'cash' => ['label' => 'Daily cash closing', 'route' => 'cash.show', 'roles' => ['DOCTOR']],
-        'import' =>['label' => 'Import old patients', 'route' => 'import.show', 'roles' => ['DOCTOR']],
+        'booking' => ['label' => 'Online booking & QR', 'route' => 'booking.index', 'roles' => ['DOCTOR', 'RECEPTIONIST']],
+        'import' => ['label' => 'Import old patients', 'route' => 'import.show', 'roles' => ['DOCTOR']],
         'staff' => ['label' => 'Staff', 'route' => 'staff.index', 'roles' => ['DOCTOR']],
         'activity' => ['label' => 'Activity log', 'route' => 'activity', 'roles' => ['DOCTOR']],
         'settings' => ['label' => 'Settings', 'route' => 'settings', 'roles' => []],
     ];
 
     public const COMING_SOON = [
-        'Prescriptions', 'Tooth chart', 'Online booking & QR', 'WhatsApp portal',
+        'WhatsApp portal',
         'Live waiting queue', 'Referral tracking', 'Staff attendance & salary', 'Doctor commissions', 'Marketing & bulk WhatsApp',
     ];
 

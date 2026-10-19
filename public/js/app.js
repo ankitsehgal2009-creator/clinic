@@ -89,7 +89,8 @@
           (opts.birth || opts.plain ? '' : ' title="' + (c ? c + ' appointments' : 'No appointments') + '"') + '>' + d + '</button>';
       }
       h += '</div><div class="pk-f"><span>' + (opts.birth ? 'Pick month and year above' : opts.plain ? '' : '<b style="color:var(--ink)">Bold</b> dates have appointments') + '</span>' +
-        (opts.birth ? '' : '<button type="button" class="btn sm" data-k="' + today + '">Today</button>') + '</div>';
+        '<span class="row" style="gap:6px">' + (opts.clearable && value ? '<button type="button" class="btn sm" data-clear>Clear</button>' : '') +
+        (opts.birth ? '' : '<button type="button" class="btn sm" data-k="' + today + '">Today</button>') + '</span></div>';
       pop.innerHTML = h;
     }
     function open(on) {
@@ -108,6 +109,7 @@
       var t = e.target.closest('button');
       if (!t) return;
       if (t.dataset.k) set(t.dataset.k);
+      if ('clear' in t.dataset) set('');
       if (t.dataset.sh) { var d = new Date(ym.y, ym.m + +t.dataset.sh, 1); ym = { y: d.getFullYear(), m: d.getMonth() }; draw(); loadCounts(); }
     });
     pop.addEventListener('change', function (e) {
@@ -124,7 +126,7 @@
   $$('[data-datepicker]').forEach(function (host) {
     var d = host.dataset;
     datePicker(host, {
-      value: d.value, name: d.name, birth: 'birth' in d, plain: 'plain' in d, placeholder: d.placeholder, min: d.min, max: d.max,
+      value: d.value, name: d.name, birth: 'birth' in d, plain: 'plain' in d, clearable: 'clearable' in d, placeholder: d.placeholder, min: d.min, max: d.max,
       onChange: function (k) {
         if (d.go) location.href = d.go + (d.go.indexOf('?') < 0 ? '?' : '&') + 'date=' + k;
         var age = $('[data-age-field]');
@@ -136,7 +138,7 @@
   });
 
   // ---------- Slot picker: 15-minute slots for one chair and day, Free (default) or Taken ----------
-  function slotPicker(host, onChange) {
+  function slotPicker(host, onChange, url) {
     var view = 'free', slots = null, value = null, req = 0, err = '';
     function draw() {
       var h = '<div class="row" style="justify-content:space-between"><span class="lbl">Time</span>' +
@@ -169,7 +171,7 @@
       load: function (date, chair, ignore) {
         var mine = ++req;
         slots = null; err = ''; value = null; onChange(null); draw();
-        get('/api/slots?date=' + date + '&chair=' + chair + (ignore ? '&ignore=' + ignore : ''))
+        get((url || '/api/slots') + '?date=' + date + '&chair=' + chair + (ignore ? '&ignore=' + ignore : ''))
           .then(function (s) { if (mine === req) { slots = s; draw(); } })
           .catch(function () { if (mine === req) { err = 'Could not load slots. Check your connection.'; draw(); } });
       },
@@ -607,12 +609,15 @@
     function data() { var o = {}; new FormData(form).forEach(function (v, k) { if (k !== '_token') o[k] = v; }); return o; }
     form.addEventListener('submit', function (e) { e.preventDefault(); });
     form.addEventListener('change', function (e) {
+      var sw = e.target.closest('.sw');
+      if (sw) pulse($('.toggle', sw));
       var field = e.target.closest('.field');
       clearTimeout(timer);
       timer = setTimeout(function () {
         if (field) field.classList.add('saving');
-        send('POST', form.action, data()).then(function () {
+        send('POST', form.action, data()).then(function (res) {
           toast('Settings saved');
+          form.dispatchEvent(new CustomEvent('autosaved', { detail: res }));
           if (e.target.id === 'name') $$('.side .brand span').forEach(function (s) { s.textContent = e.target.value; });
         }).catch(function (err) { toast(err.message, true); })
           .then(function () { if (field) field.classList.remove('saving'); });
@@ -659,8 +664,8 @@
   // ---------- Print with options: paper size, orientation, margins and fit to one page ----------
   var PAPER = { A4: [210, 297], A5: [148, 210], Letter: [216, 279] };
   var MARGIN = { normal: 12, narrow: 6, none: 0 };
-  function printOpts() {
-    try { return JSON.parse(localStorage.getItem('sd-print') || '') || {}; } catch (e) { return {}; }
+  function printOpts(k) {
+    try { return JSON.parse(localStorage.getItem('sd-print:' + k) || '') || {}; } catch (e) { return {}; }
   }
   function printWith(target, o) {
     var size = PAPER[o.paper] || PAPER.A4, land = o.orient === 'landscape', m = MARGIN[o.margin] != null ? MARGIN[o.margin] : 12;
@@ -679,8 +684,8 @@
   }
   $$('[data-print]').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var target = $(btn.dataset.print), o = printOpts();
-      o = { paper: o.paper || 'A4', orient: o.orient || 'portrait', margin: o.margin || 'normal', scale: o.scale || 'fit' };
+      var target = $(btn.dataset.print), o = printOpts(btn.dataset.print);
+      o = { paper: o.paper || btn.dataset.paper || 'A4', orient: o.orient || 'portrait', margin: o.margin || 'normal', scale: o.scale || 'fit' };
       var sel = function (name, label, opts) {
         return '<div class="field"><label>' + label + '</label><select class="inp" name="' + name + '">' + opts.map(function (x) {
           return '<option value="' + x[0] + '"' + (o[name] === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>';
@@ -705,9 +710,14 @@
       form.addEventListener('change', info);
       form.addEventListener('submit', function (e) {
         e.preventDefault(); read();
-        try { localStorage.setItem('sd-print', JSON.stringify(o)); } catch (err) {}
+        try { localStorage.setItem('sd-print:' + btn.dataset.print, JSON.stringify(o)); } catch (err) {}
         printWith(target, o); m.remove();
-        setTimeout(function () { window.print(); }, 50);
+        var iso = 'isolate' in btn.dataset;
+        if (iso) { document.body.classList.add('print-isolate'); target.classList.add('print-target'); }
+        setTimeout(function () {
+          window.print();
+          if (iso) setTimeout(function () { document.body.classList.remove('print-isolate'); target.classList.remove('print-target'); }, 500);
+        }, 50);
       });
       $('[data-x]', m).addEventListener('click', close);
       m.addEventListener('click', function (e) { if (e.target === m) close(); });
@@ -716,4 +726,192 @@
       $('select', m).focus();
     });
   });
+
+  // ---------- Medicine rows: prescription form and template editor ----------
+  function medRows(form) {
+    var body = $('[data-meds]', form), tpl = $('#med-tpl', form);
+    function add(v) {
+      var tr = tpl.content.firstElementChild.cloneNode(true), i = body.children.length + Date.now() % 100000;
+      $$('[data-f]', tr).forEach(function (inp) { inp.name = 'meds[' + i + '][' + inp.dataset.f + ']'; if (v && v[inp.dataset.f] != null) inp.value = v[inp.dataset.f]; });
+      body.appendChild(tr);
+      tr.style.animation = 'rise .3s var(--ease-out)';
+      return tr;
+    }
+    function set(list) { body.innerHTML = ''; (list || []).forEach(add); if (!body.children.length) add(); }
+    body.addEventListener('click', function (e) {
+      var d = e.target.closest('[data-del]');
+      if (!d) return;
+      d.closest('tr').remove();
+      if (!body.children.length) add();
+    });
+    $('[data-add]', form).addEventListener('click', function () { $('[data-f="name"]', add()).focus(); });
+    return { set: set, add: add };
+  }
+
+  var rxForm = $('#rxform');
+  if (rxForm) (function () {
+    var rows = medRows(rxForm), tpls = JSON.parse(rxForm.dataset.templates || '{}'), old = JSON.parse(rxForm.dataset.old || 'null');
+    var sel = $('[data-tpl]', rxForm), advice = $('[data-advice]', rxForm);
+    patientPicker(rxForm, function () {});
+    function load(id, quiet) {
+      var t = tpls[id];
+      if (!t) return;
+      rows.set(t.meds);
+      advice.value = t.advice || '';
+      if (!quiet) toast('Template loaded');
+    }
+    if (old) rows.set(Array.isArray(old) ? old : Object.keys(old).map(function (k) { return old[k]; }));
+    else if (rxForm.dataset.default && tpls[rxForm.dataset.default]) { sel.value = rxForm.dataset.default; load(sel.value, true); }
+    else rows.set([]);
+    sel.addEventListener('change', function () { if (sel.value) load(sel.value); });
+    rxForm.addEventListener('submit', function () { $('[data-save]', rxForm).disabled = true; });
+  })();
+
+  var tplForm = $('#tplform');
+  if (tplForm) (function () {
+    var rows = medRows(tplForm), old = JSON.parse(tplForm.dataset.old || '[]');
+    rows.set(Array.isArray(old) ? old : Object.keys(old).map(function (k) { return old[k]; }));
+  })();
+
+  // ---------- Tooth chart: tap a tooth, see its history, mark its state ----------
+  $$('[data-chart]').forEach(function (card) {
+    var cfg = JSON.parse(card.dataset.chart), panel = $('[data-panel]', card), cur = null;
+    function draw(n) {
+      var m = cfg.marks[n] || { state: 'healthy' }, hist = cfg.history[n] || [], st = m.state;
+      var h = '<h3>Tooth ' + n + ' · ' + esc(cfg.names[n]) + '</h3><div class="muted">' + esc(cfg.states[st]) +
+        (m.by ? ' · marked by ' + esc(m.by) + ' on ' + esc(m.at) : '') + '</div>' + (m.note ? '<p style="margin:6px 0 0">' + esc(m.note) + '</p>' : '');
+      if (cfg.save) {
+        h += '<div class="tstates" role="radiogroup" aria-label="State of tooth ' + n + '">' + Object.keys(cfg.states).map(function (k) {
+          return '<button type="button" role="radio" aria-checked="' + (k === st) + '" class="' + (k === st ? 'on' : '') + '" data-st="' + k + '"><i class="st-' + k + '" style="background:var(--surface)"></i>' + esc(cfg.states[k]) + '</button>';
+        }).join('') + '</div><div class="row" style="flex-wrap:nowrap"><input class="inp" data-note maxlength="250" placeholder="Note, e.g. deep caries, distal" value="' + esc(m.note || '') + '" aria-label="Note for tooth ' + n + '"><button type="button" class="btn pri" data-tsave>Save</button></div>';
+      }
+      h += '<b style="display:block;margin-top:12px">Visits for this tooth</b>' + (hist.length ? '<ul class="thist">' + hist.map(function (v) {
+        return '<li><span class="mono muted" style="width:92px;flex:none">' + esc(v.date) + '</span><span style="flex:1">' + esc(v.what) + '</span>' + (cfg.rxShow ? '<a class="btn sm" href="' + cfg.rxShow + '/' + v.id + '">Rx</a>' : '') + '</li>';
+      }).join('') + '</ul>' : '<p class="muted" style="margin:4px 0 0">No visits name this tooth yet.</p>') +
+        (cfg.rx ? '<a class="btn" style="margin-top:10px" href="' + cfg.rx + '&tooth=' + n + '">New visit for tooth ' + n + '</a>' : '');
+      panel.innerHTML = h;
+      panel.style.animation = 'none'; void panel.offsetWidth; panel.style.animation = '';
+    }
+    card.addEventListener('click', function (e) {
+      var t = e.target.closest('.tooth');
+      if (t) {
+        $$('.tooth.sel', card).forEach(function (x) { x.classList.remove('sel'); });
+        t.classList.add('sel'); cur = +t.dataset.n; draw(cur);
+        return;
+      }
+      var set = e.target.closest('[data-set]');
+      if (set) {
+        $$('[data-set]', card).forEach(function (b) { b.classList.toggle('on', b === set); });
+        $$('[data-teeth]', card).forEach(function (d) { d.hidden = d.dataset.teeth !== set.dataset.set; });
+        return;
+      }
+      var b = e.target.closest('[data-st]');
+      if (b) { $$('[data-st]', panel).forEach(function (x) { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); }); return; }
+      if (e.target.closest('[data-tsave]')) {
+        var on = $('[data-st].on', panel), note = $('[data-note]', panel).value.trim(), st = on ? on.dataset.st : 'healthy', btn = e.target.closest('[data-tsave]');
+        btn.disabled = true;
+        send('POST', cfg.save, { tooth: cur, state: st, note: note }).then(function (r) {
+          if (st === 'healthy' && !note) delete cfg.marks[cur]; else cfg.marks[cur] = { state: st, note: note, by: r.by, at: r.at };
+          var t = $('.tooth[data-n="' + cur + '"]', card);
+          t.className = t.className.replace(/\bst-\w+/g, '').trim() + ' st-' + st;
+          t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash');
+          toast('Tooth ' + cur + ' saved'); draw(cur);
+        }).catch(function (err) { toast(err.message, true); btn.disabled = false; });
+      }
+    });
+  });
+  var teethPick = $('#teethpick');
+  if (teethPick) patientPicker(teethPick, function () {
+    var id = $('[data-pid]', teethPick).value;
+    if (id) location.href = teethPick.dataset.go + '?patient=' + id;
+  });
+
+  // ---------- Online booking: QR card, copy link, open slots preview ----------
+  function drawQr(box, text) {
+    if (!window.qrcode) return;
+    var q = window.qrcode(0, 'M'); q.addData(text); q.make();
+    box.innerHTML = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+  }
+  $$('[data-qr]').forEach(function (b) { drawQr(b, b.dataset.qr); });
+  $$('[data-copy]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var done = function () { toast('Link copied'); };
+      if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).then(done, function () { prompt('Copy this link', b.dataset.copy); });
+      else prompt('Copy this link', b.dataset.copy);
+    });
+  });
+  $$('[data-qr-download]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var svg = $('.qr svg'), card = $('#qrcard');
+      if (!svg) return;
+      var c = document.createElement('canvas'), W = 600, H = 820, x = c.getContext('2d'), img = new Image();
+      c.width = W; c.height = H;
+      x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+      x.fillStyle = '#10211f'; x.textAlign = 'center';
+      x.font = '700 30px "Bricolage Grotesque", sans-serif'; x.fillText($('.qr-clinic', card).textContent, W / 2, 80);
+      x.fillStyle = '#0d6e66'; x.font = '700 40px "Bricolage Grotesque", sans-serif'; x.fillText('Book your next visit', W / 2, 140);
+      img.onload = function () {
+        x.drawImage(img, 100, 180, 400, 400);
+        x.fillStyle = '#555c59'; x.font = '24px "IBM Plex Sans", sans-serif'; x.fillText('Scan with your phone camera', W / 2, 640);
+        x.fillStyle = '#10211f'; x.font = '20px "IBM Plex Mono", monospace'; x.fillText($('[data-link-text]', card).textContent, W / 2, 690);
+        var a = el('a', { href: c.toDataURL('image/png'), download: b.dataset.qrDownload }); document.body.appendChild(a); a.click(); a.remove();
+      };
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.outerHTML);
+    });
+  });
+  var bookForm = $('[data-booking-form]');
+  if (bookForm) bookForm.addEventListener('autosaved', function (e) {
+    var link = e.detail && e.detail.link;
+    if (!link) return;
+    $$('[data-copy]').forEach(function (b) { b.dataset.copy = link; });
+    $$('[data-link-open]').forEach(function (a) { a.href = link; });
+    $$('[data-link-text]').forEach(function (s) { s.textContent = link; });
+    $$('[data-slug-echo]').forEach(function (s) { s.textContent = link.split('/').pop(); });
+    $$('[data-qr]').forEach(function (q) { q.dataset.qr = link; drawQr(q, link); });
+  });
+  var openSlots = $('#openslots');
+  if (openSlots) (function () {
+    var sp = slotPicker($('[data-slots]', openSlots), function () {}, '/api/booking/slots'), chair = $('#obch'), date = $('input[name="obdate"]', openSlots);
+    function load() { if (chair.value) sp.load(date.value, chair.value); }
+    openSlots.addEventListener('datechange', load);
+    chair.addEventListener('change', load);
+    load();
+  })();
+
+  // ---------- Patient booking page: day, then a free time, then details ----------
+  var pub = $('#pubbook');
+  if (pub) (function () {
+    var dateIn = $('[data-date-value]', pub), timeIn = $('[data-time-value]', pub), times = $('[data-times]', pub), btn = $('[data-book-btn]', pub), req = 0;
+    function label(m) { return fmtTime(m); }
+    function refresh() {
+      var ok = dateIn.value && timeIn.value;
+      btn.disabled = !ok;
+      btn.textContent = ok ? 'Book ' + fmtKey(dateIn.value).replace(/ \d{4}$/, '') + ', ' + label(+timeIn.value) : 'Pick a day and time';
+    }
+    function pickDay(d, keepTime) {
+      $$('[data-day]', pub).forEach(function (b) { b.setAttribute('aria-checked', b.dataset.day === d); });
+      dateIn.value = d; if (!keepTime) timeIn.value = ''; refresh();
+      var mine = ++req;
+      times.innerHTML = '<p class="muted">Loading times…</p>';
+      get(pub.dataset.slotsUrl + '?date=' + d).then(function (list) {
+        if (mine !== req) return;
+        if (!list.length) { times.innerHTML = '<p class="muted">No free times on this day. Please pick another day.</p>'; timeIn.value = ''; refresh(); return; }
+        times.innerHTML = [['Morning', list.filter(function (m) { return m < 900; })], ['Evening', list.filter(function (m) { return m >= 900; })]].filter(function (g) { return g[1].length; }).map(function (g) {
+          return '<div><small class="muted">' + g[0] + '</small><div class="tg">' + g[1].map(function (m, i) {
+            return '<button type="button" data-m="' + m + '" style="animation-delay:' + Math.min(i * 15, 300) + 'ms" class="' + (String(m) === timeIn.value ? 'on' : '') + '">' + label(m).replace(' AM', ' am').replace(' PM', ' pm') + '</button>';
+          }).join('') + '</div></div>';
+        }).join('');
+        if (timeIn.value && !$('[data-m="' + timeIn.value + '"]', times)) { timeIn.value = ''; refresh(); }
+      }).catch(function () { times.innerHTML = '<p class="err">Could not load times. Check your internet and try again.</p>'; });
+    }
+    pub.addEventListener('click', function (e) {
+      var d = e.target.closest('[data-day]');
+      if (d) return pickDay(d.dataset.day);
+      var t = e.target.closest('[data-m]');
+      if (t) { $$('[data-m]', times).forEach(function (x) { x.classList.toggle('on', x === t); }); timeIn.value = t.dataset.m; refresh(); $('#bn').focus({ preventScroll: true }); }
+    });
+    pub.addEventListener('submit', function () { btn.disabled = true; btn.textContent = 'Booking…'; });
+    if (pub.dataset.oldDate) { timeIn.value = pub.dataset.oldTime; pickDay(pub.dataset.oldDate, true); }
+    else { var first = $('[data-day]', pub); if (first) pickDay(first.dataset.day); }
+  })();
 })();
