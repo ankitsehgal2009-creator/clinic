@@ -4,6 +4,8 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\ApiController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BillingController;
+use App\Http\Controllers\CashController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\PatientController;
@@ -51,6 +53,30 @@ Route::middleware(['auth', 'page'])->group(function () {
         Route::get('/patients/{patient}', [PatientController::class, 'show'])->name('patients.show');
         Route::post('/patients/{patient}/active', [PatientController::class, 'active'])->name('patients.active');
         Route::delete('/patients/{patient}', [PatientController::class, 'destroy'])->name('patients.destroy');
+    });
+
+    Route::middleware('page:billing')->group(function () {
+        Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
+        Route::get('/billing/new', [BillingController::class, 'create'])->name('billing.create');
+        Route::post('/billing', [BillingController::class, 'store'])->name('billing.store');
+        Route::get('/billing/prices', [BillingController::class, 'prices'])->name('billing.prices');
+        Route::post('/billing/prices', [BillingController::class, 'savePrice'])->name('billing.prices.store');
+        Route::post('/billing/prices/{price}', [BillingController::class, 'savePrice'])->name('billing.prices.update');
+        Route::post('/billing/prices/{price}/active', [BillingController::class, 'priceActive'])->name('billing.prices.active');
+        Route::get('/billing/{invoice}', [BillingController::class, 'show'])->whereNumber('invoice')->name('billing.show');
+        Route::post('/billing/{invoice}/pay', [BillingController::class, 'pay'])->name('billing.pay');
+        Route::post('/billing/{invoice}/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
+        Route::delete('/billing/{invoice}', [BillingController::class, 'destroy'])->name('billing.destroy');
+        Route::delete('/payments/{payment}', [BillingController::class, 'unpay'])->name('payments.destroy');
+        Route::get('/api/billing/patients', [ApiController::class, 'search']);
+    });
+
+    Route::middleware('page:cash')->group(function () {
+        Route::get('/cash', [CashController::class, 'show'])->name('cash.show');
+        Route::post('/cash/payouts', [CashController::class, 'payout'])->name('cash.payout');
+        Route::delete('/cash/payouts/{payout}', [CashController::class, 'removePayout'])->name('cash.payout.destroy');
+        Route::post('/cash/close', [CashController::class, 'close'])->name('cash.close');
+        Route::post('/cash/reopen', [CashController::class, 'reopen'])->name('cash.reopen');
     });
 
     Route::middleware('page:staff')->group(function () {

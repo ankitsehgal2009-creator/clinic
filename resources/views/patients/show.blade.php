@@ -19,14 +19,16 @@
         </div>
         <div class="row" style="margin-top:8px">
           @unless ($p->active)<span class="chip c-bad">Disabled</span>@endunless
+          @if ($balance > 0)<span class="chip c-bad">Balance due {{ \App\Support\Money::inr($balance) }}</span>@endif
           @foreach ($p->medical_history ?? [] as $h)<span class="chip c-warn">{{ $h }}</span>@endforeach
         </div>
       </div>
     </div>
     <div class="row">
       @if (auth()->user()->canOpen('appointments') && $p->active)<a class="btn pri" href="{{ route('appointments.create', ['patient' => $p->id]) }}">Book appointment</a>@endif
+      @if (auth()->user()->canOpen('billing'))<a class="btn" href="{{ route('billing.create', ['patient' => $p->id]) }}">New bill</a>@endif
       @if (auth()->user()->isAdmin())
-        <form method="post" action="{{ route('patients.destroy', $p) }}" data-confirm="Delete {{ $p->name }} and all their appointments? This cannot be undone.">@csrf @method('DELETE')<button class="btn danger">Delete permanently</button></form>
+        <form method="post" action="{{ route('patients.destroy', $p) }}" data-confirm="Delete {{ $p->name }} with all their appointments and bills? This cannot be undone.">@csrf @method('DELETE')<button class="btn danger">Delete permanently</button></form>
       @endif
     </div>
   </div>
@@ -44,6 +46,21 @@
       <p class="muted">No appointments yet.</p>
     @endif
   </div>
+  @if ($bills !== null)
+  <div class="card">
+    <h2>Bills</h2>
+    @if ($bills->isNotEmpty())
+      <div class="tw"><table><thead><tr><th>Bill</th><th>Date</th><th style="text-align:right">Total</th><th>Status</th></tr></thead><tbody>
+        @foreach ($bills as $b)
+          @php([$bl, $bc] = \App\Models\Invoice::STATE[$b->state()])
+          <tr class="{{ $b->cancelled_at ? 'off' : '' }}"><td><a class="mono" href="{{ route('billing.show', $b) }}">{{ $b->number }}</a></td><td>{{ Fmt::date($b->date) }}</td><td class="mono" style="text-align:right">{{ \App\Support\Money::inr($b->total) }}</td><td><span class="chip {{ $bc }}">{{ $bl }}{{ $b->state() === 'PART' ? ' · '.\App\Support\Money::inr($b->due()).' due' : '' }}</span></td></tr>
+        @endforeach
+      </tbody></table></div>
+    @else
+      <p class="muted">No bills yet.</p>
+    @endif
+  </div>
+  @endif
   <div class="card">
     <h2>Details</h2>
     <p style="margin:0"><span class="muted">Address:</span> {{ $p->address ?: '—' }}</p>

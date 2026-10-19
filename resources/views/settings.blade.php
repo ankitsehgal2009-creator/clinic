@@ -14,7 +14,8 @@
       <div class="field full"><label for="address">Address</label><input id="address" name="address" class="inp" value="{{ old('address', $c->address) }}"></div>
       <div class="field"><label for="city">City and PIN</label><input id="city" name="city" class="inp" value="{{ old('city', $c->city) }}"></div>
       <div class="field"><label for="phone">Phone</label><input id="phone" name="phone" class="inp" value="{{ old('phone', $c->phone) }}"></div>
-      <div class="field"><label for="gstin">GSTIN</label><input id="gstin" name="gstin" class="inp mono" maxlength="15" value="{{ old('gstin', $c->gstin) }}"></div>
+      <div class="field"><label for="gstin">GSTIN</label><input id="gstin" name="gstin" class="inp mono" maxlength="15" value="{{ old('gstin', $c->gstin) }}"><span class="hint">Printed on every bill. Leave blank if the clinic isn't registered for GST; bills then carry no GST.</span></div>
+      <div class="field"><label for="invoice_prefix">Bill number starts with</label><input id="invoice_prefix" name="invoice_prefix" class="inp mono" maxlength="8" value="{{ old('invoice_prefix', $c->invoice_prefix) }}"><span class="hint">Bills are numbered like {{ $c->invoice_prefix }}/{{ \App\Support\Money::fy(\App\Support\Fmt::today()) }}/0001 and restart every 1 April.</span></div>
       <div class="field"><label for="chairs">Chairs</label><input id="chairs" name="chairs" type="number" min="1" max="20" class="inp" value="{{ old('chairs', $chairs) }}"></div>
       @foreach (['morning_open' => 'Opens', 'morning_close' => 'Break starts', 'evening_open' => 'Break ends', 'evening_close' => 'Closes'] as $k => $l)
         <div class="field"><label for="{{ $k }}">{{ $l }}</label><select id="{{ $k }}" name="{{ $k }}" class="inp">@foreach ($times as $t)<option value="{{ $t }}" @selected(old($k, $hhmm($c->$k)) === $t)>{{ \App\Support\Fmt::time((int) substr($t, 0, 2) * 60 + (int) substr($t, 3)) }}</option>@endforeach</select></div>

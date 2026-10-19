@@ -101,6 +101,8 @@ class PatientController extends Controller
         return view('patients.show', [
             'p' => $patient,
             'appts' => $patient->appointments()->with('chair', 'doctor')->orderByDesc('date')->orderByDesc('start_min')->limit(50)->get(),
+            'bills' => $this->me()->canOpen('billing') ? $patient->invoices()->orderByDesc('date')->orderByDesc('id')->limit(50)->get() : null,
+            'balance' => $patient->balance(),
             'family' => Patient::where('clinic_id', $patient->clinic_id)->where('mobile', $patient->mobile)->whereKeyNot($patient->id)->get(['id', 'name', 'code']),
         ]);
     }
@@ -119,6 +121,7 @@ class PatientController extends Controller
         abort_unless($this->me()->isAdmin(), 403, 'Only the admin can delete permanently.');
         DB::transaction(function () use ($patient) {
             $patient->appointments()->delete();
+            $patient->invoices()->delete(); // payments go with their bills
             $patient->delete();
         });
         Activity::log($this->me(), 'Deleted patient permanently', "$patient->name · $patient->code");

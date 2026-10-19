@@ -11,14 +11,16 @@ class Pages
         'dashboard' => ['label' => 'Dashboard', 'route' => 'dashboard', 'roles' => ['DOCTOR', 'RECEPTIONIST', 'ASSISTANT']],
         'appointments' => ['label' => 'Appointments', 'route' => 'appointments.index', 'roles' => ['DOCTOR', 'RECEPTIONIST', 'ASSISTANT']],
         'patients' => ['label' => 'Patients', 'route' => 'patients.index', 'roles' => ['DOCTOR', 'RECEPTIONIST', 'ASSISTANT']],
-        'import' => ['label' => 'Import old patients', 'route' => 'import.show', 'roles' => ['DOCTOR']],
+        'billing' => ['label' => 'Billing & GST', 'route' => 'billing.index', 'roles' => ['DOCTOR']],
+        'cash' => ['label' => 'Daily cash closing', 'route' => 'cash.show', 'roles' => ['DOCTOR']],
+        'import' =>['label' => 'Import old patients', 'route' => 'import.show', 'roles' => ['DOCTOR']],
         'staff' => ['label' => 'Staff', 'route' => 'staff.index', 'roles' => ['DOCTOR']],
         'activity' => ['label' => 'Activity log', 'route' => 'activity', 'roles' => ['DOCTOR']],
         'settings' => ['label' => 'Settings', 'route' => 'settings', 'roles' => []],
     ];
 
     public const COMING_SOON = [
-        'Billing & GST', 'Prescriptions', 'Tooth chart', 'Daily cash closing', 'Online booking & QR', 'WhatsApp portal',
+        'Prescriptions', 'Tooth chart', 'Online booking & QR', 'WhatsApp portal',
         'Live waiting queue', 'Referral tracking', 'Staff attendance & salary', 'Doctor commissions', 'Marketing & bulk WhatsApp',
     ];
 

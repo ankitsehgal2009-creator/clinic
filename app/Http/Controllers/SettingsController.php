@@ -30,6 +30,7 @@ class SettingsController extends Controller
             'gstin' => ['nullable', 'regex:/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i'],
             'morning_open' => $time, 'morning_close' => $time, 'evening_open' => $time, 'evening_close' => $time,
             'chairs' => 'required|integer|min:1|max:20',
+            'invoice_prefix' => 'required|alpha_num|max:8',
         ], ['gstin.regex' => 'GSTIN should be 15 characters, like 27AAKFS4821M1Z6.']);
         $min = fn ($t) => (int) substr($t, 0, 2) * 60 + (int) substr($t, 3, 2);
         [$mo, $mc, $eo, $ec] = array_map($min, [$v['morning_open'], $v['morning_close'], $v['evening_open'], $v['evening_close']]);
@@ -38,7 +39,7 @@ class SettingsController extends Controller
         }
         $me->clinic->update([
             'name' => $v['name'], 'address' => $v['address'], 'city' => $v['city'], 'phone' => $v['phone'],
-            'gstin' => $v['gstin'] ? strtoupper($v['gstin']) : null,
+            'gstin' => $v['gstin'] ? strtoupper($v['gstin']) : null, 'invoice_prefix' => strtoupper($v['invoice_prefix']),
             'morning_open' => $mo, 'morning_close' => $mc, 'evening_open' => $eo, 'evening_close' => $ec,
         ]);
         $have = Chair::where('clinic_id', $me->clinic_id)->orderBy('id')->get();

@@ -58,7 +58,7 @@
         '<span class="' + (value ? '' : 'muted') + '">' + esc(value ? fmtKey(value) : opts.placeholder || 'Pick a date') + '</span>';
     }
     function loadCounts() {
-      if (opts.birth) return;
+      if (opts.birth || opts.plain) return;
       get('/api/appointments/counts?month=' + ym.y + '-' + pad(ym.m + 1)).then(function (c) { counts = c; draw(); }).catch(function () {});
     }
     function draw() {
@@ -72,11 +72,11 @@
         '<div class="pk-w">' + ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(function (w) { return '<span>' + w + '</span>'; }).join('') + '</div><div class="pk-g">';
       for (var b = 0; b < first; b++) h += '<span></span>';
       for (var d = 1; d <= days; d++) {
-        var k = key(ym.y, ym.m, d), c = counts[k] || 0, off = (opts.min && k < opts.min) || (opts.birth && k > today);
+        var k = key(ym.y, ym.m, d), c = counts[k] || 0, off = (opts.min && k < opts.min) || (opts.max && k > opts.max) || (opts.birth && k > today);
         h += '<button type="button" class="pd' + (k === value ? ' sel' : '') + (k === today ? ' today' : '') + (c ? ' has' : '') + '" data-k="' + k + '"' + (off ? ' disabled style="opacity:.3;cursor:not-allowed"' : '') +
-          (opts.birth ? '' : ' title="' + (c ? c + ' appointments' : 'No appointments') + '"') + '>' + d + '</button>';
+          (opts.birth || opts.plain ? '' : ' title="' + (c ? c + ' appointments' : 'No appointments') + '"') + '>' + d + '</button>';
       }
-      h += '</div><div class="pk-f"><span>' + (opts.birth ? 'Pick month and year above' : '<b style="color:var(--ink)">Bold</b> dates have appointments') + '</span>' +
+      h += '</div><div class="pk-f"><span>' + (opts.birth ? 'Pick month and year above' : opts.plain ? '' : '<b style="color:var(--ink)">Bold</b> dates have appointments') + '</span>' +
         (opts.birth ? '' : '<button type="button" class="btn sm" data-k="' + today + '">Today</button>') + '</div>';
       pop.innerHTML = h;
     }
@@ -112,7 +112,7 @@
   $$('[data-datepicker]').forEach(function (host) {
     var d = host.dataset;
     datePicker(host, {
-      value: d.value, name: d.name, birth: 'birth' in d, placeholder: d.placeholder, min: d.min,
+      value: d.value, name: d.name, birth: 'birth' in d, plain: 'plain' in d, placeholder: d.placeholder, min: d.min, max: d.max,
       onChange: function (k) {
         if (d.go) location.href = d.go + (d.go.indexOf('?') < 0 ? '?' : '&') + 'date=' + k;
         var age = $('[data-age-field]');
@@ -164,19 +164,10 @@
     };
   }
 
-  // ---------- Book appointment ----------
-  var booking = $('#booking');
-  if (booking) (function () {
-    var q = $('[data-search]', booking), list = $('#pq-list'), pid = $('[data-pid]', booking), picked = $('[data-picked]', booking), hint = $('[data-hint]', booking);
-    var slotInput = $('[data-slot-value]', booking), bookBtn = $('[data-book]', booking), chair = $('[name="chair_id"]', booking);
-    var hits = [], idx = 0, timer, pickedName = pid.value ? q.value : null, slot = null;
-    var dateInput = $('[name="date"]', booking);
-
-    function refresh() {
-      var ok = pid.value && slot != null;
-      bookBtn.disabled = !ok;
-      bookBtn.textContent = slot != null ? 'Book ' + fmtKey(dateInput.value) + ', ' + fmtTime(slot) : 'Pick a patient and a free slot';
-    }
+  // ---------- Patient picker: suggestions after 3 letters, shows ID, mobile and relative ----------
+  function patientPicker(root, onChange) {
+    var q = $('[data-search]', root), list = $('.sugg', root), pid = $('[data-pid]', root), picked = $('[data-picked]', root), hint = $('[data-hint]', root);
+    var hits = [], idx = 0, timer, pickedName = pid.value ? q.value : null;
     function show(open) { list.classList.toggle('hide', !open); q.setAttribute('aria-expanded', open ? 'true' : 'false'); }
     function drawList() {
       list.innerHTML = hits.map(function (h, i) {
@@ -189,11 +180,11 @@
     function choose(h) {
       pid.value = h.id; pickedName = h.name; q.value = h.name;
       picked.textContent = h.code + ' · ' + h.mobile; picked.classList.remove('hide'); hint.classList.add('hide');
-      show(false); refresh();
+      show(false); onChange();
     }
     q.addEventListener('input', function () {
       clearTimeout(timer);
-      if (q.value !== pickedName) { pid.value = ''; picked.classList.add('hide'); hint.classList.remove('hide'); refresh(); }
+      if (q.value !== pickedName) { pid.value = ''; picked.classList.add('hide'); hint.classList.remove('hide'); onChange(); }
       var term = q.value.trim();
       if (term.length < 3) { hits = []; show(false); return; }
       timer = setTimeout(function () {
@@ -208,6 +199,20 @@
     });
     list.addEventListener('mousedown', function (e) { var o = e.target.closest('[data-i]'); if (o) { e.preventDefault(); choose(hits[+o.dataset.i]); } });
     q.addEventListener('blur', function () { setTimeout(function () { show(false); }, 150); });
+    return { id: function () { return pid.value; } };
+  }
+
+  // ---------- Book appointment ----------
+  var booking = $('#booking');
+  if (booking) (function () {
+    var slotInput = $('[data-slot-value]', booking), bookBtn = $('[data-book]', booking), chair = $('[name="chair_id"]', booking);
+    var slot = null, dateInput = $('[name="date"]', booking);
+    function refresh() {
+      var ok = pp.id() && slot != null;
+      bookBtn.disabled = !ok;
+      bookBtn.textContent = slot != null ? 'Book ' + fmtKey(dateInput.value) + ', ' + fmtTime(slot) : 'Pick a patient and a free slot';
+    }
+    var pp = patientPicker(booking, function () { refresh(); });
 
     var sp = slotPicker($('[data-slots]', booking), function (m) { slot = m; slotInput.value = m == null ? '' : m; refresh(); });
     function reload() { sp.load(dateInput.value, chair.value); }
@@ -215,6 +220,98 @@
     chair.addEventListener('change', reload);
     booking.addEventListener('submit', function () { bookBtn.disabled = true; });
     reload(); refresh();
+  })();
+
+  // ---------- Money: paise in, ₹1,23,456 out (the server recalculates everything on save) ----------
+  function paise(v) {
+    var s = String(v == null ? '' : v).replace(/[,₹\s]/g, '');
+    return /^\d{1,9}(\.\d{1,2})?$/.test(s) ? Math.round(parseFloat(s) * 100) : 0;
+  }
+  function inr(p) {
+    var r = Math.floor(Math.abs(p) / 100), f = Math.abs(p) % 100, s = String(r);
+    if (s.length > 3) s = s.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + s.slice(-3);
+    return (p < 0 ? '−' : '') + '₹' + s + (f ? '.' + pad(f) : '');
+  }
+
+  // ---------- New bill: treatment lines with live totals ----------
+  var bill = $('#bill');
+  if (bill) (function () {
+    var prices = JSON.parse(bill.dataset.prices || '[]'), hasGst = bill.dataset.gst === '1';
+    var body = $('[data-lines]', bill), tpl = $('#line-tpl'), saveBtn = $('[data-save]', bill), saveHint = $('[data-save-hint]', bill);
+    var payAmt = $('#pay_amount'), total = 0, n = 0;
+    var pp = patientPicker(bill, function () { refresh(); });
+
+    function f(tr, k) { return $('[data-f="' + k + '"]', tr); }
+    function addLine(v) {
+      var tr = tpl.content.firstElementChild.cloneNode(true), i = n++;
+      $$('[data-f]', tr).forEach(function (inp) { inp.name = 'items[' + i + '][' + inp.dataset.f + ']'; });
+      v = v || {};
+      ['name', 'tooth', 'qty', 'rate', 'discount', 'sac', 'gst'].forEach(function (k) { if (v[k] != null && f(tr, k)) f(tr, k).value = v[k]; });
+      body.appendChild(tr);
+      if (!v.name) f(tr, 'name').focus();
+      refresh();
+    }
+    body.addEventListener('change', function (e) {
+      if (!e.target.matches('[data-f="name"]')) return;
+      var tr = e.target.closest('tr'), p = prices.filter(function (x) { return x.name === e.target.value; })[0];
+      if (p) { f(tr, 'rate').value = p.rate; f(tr, 'sac').value = p.sac; if (f(tr, 'gst')) f(tr, 'gst').value = p.gst; }
+      refresh();
+    });
+    body.addEventListener('input', refresh);
+    body.addEventListener('click', function (e) {
+      if (!e.target.closest('[data-del]')) return;
+      e.target.closest('tr').remove();
+      if (!body.children.length) addLine();
+      refresh();
+    });
+    $('[data-add]', bill).addEventListener('click', function () { addLine(); });
+    $('[data-full]', bill).addEventListener('click', function () { payAmt.value = total ? (total % 100 ? (total / 100).toFixed(2) : total / 100) : ''; refresh(); });
+    payAmt.addEventListener('input', refresh);
+
+    function refresh() {
+      var t = { gross: 0, discount: 0, cgst: 0, sgst: 0 };
+      $$('tr', body).forEach(function (tr) {
+        var qty = Math.max(1, parseInt(f(tr, 'qty').value, 10) || 1), rate = paise(f(tr, 'rate').value);
+        var gross = qty * rate, disc = Math.min(paise(f(tr, 'discount').value), gross), gst = hasGst ? +f(tr, 'gst').value : 0;
+        var half = Math.round((gross - disc) * gst / 200);
+        t.gross += gross; t.discount += disc; t.cgst += half; t.sgst += half;
+        $('[data-amt]', tr).textContent = inr(gross - disc + 2 * half);
+      });
+      total = t.gross - t.discount + t.cgst + t.sgst;
+      $('[data-t="gross"]', bill).textContent = inr(t.gross);
+      $('[data-t="discount"]', bill).textContent = t.discount ? '− ' + inr(t.discount) : '₹0';
+      if (hasGst) { $('[data-t="cgst"]', bill).textContent = inr(t.cgst); $('[data-t="sgst"]', bill).textContent = inr(t.sgst); }
+      $('[data-t="total"]', bill).textContent = inr(total);
+      var paid = paise(payAmt.value), problem = !pp.id() ? 'Pick the patient.' : !total ? 'Add a treatment with a price.' : paid > total ? 'Amount received is more than the total.' : '';
+      saveBtn.disabled = !!problem;
+      saveHint.textContent = problem || (paid ? (paid < total ? 'Balance ' + inr(total - paid) + ' stays due.' : 'Paid in full.') : 'Nothing received now; the full amount stays due.');
+    }
+    bill.addEventListener('submit', function () { saveBtn.disabled = true; });
+    var old = JSON.parse(bill.dataset.old || '[]');
+    (Array.isArray(old) ? old : Object.keys(old).map(function (k) { return old[k]; })).forEach(addLine);
+    if (!body.children.length) addLine();
+  })();
+
+  // ---------- Cash closing: count notes, compare with expected ----------
+  var cash = $('[data-cash]');
+  if (cash) (function () {
+    var expected = +cash.dataset.expected, reason = $('[data-reason]', cash), diffChip = $('[data-diff]', cash);
+    function refresh() {
+      var counted = 0;
+      $$('[data-note]', cash).forEach(function (inp) {
+        var sub = Math.max(0, parseInt(inp.value, 10) || 0) * +inp.dataset.note * 100;
+        counted += sub;
+        inp.nextElementSibling.textContent = inr(sub);
+      });
+      $('[data-counted]', cash).textContent = inr(counted);
+      var d = counted - expected;
+      diffChip.className = 'chip ' + (d ? 'c-bad' : 'c-ok');
+      diffChip.textContent = d ? (d > 0 ? 'Extra ' : 'Short ') + inr(Math.abs(d)) : 'Matches ' + inr(expected);
+      reason.classList.toggle('hide', !d);
+      $('input', reason).required = !!d;
+    }
+    cash.addEventListener('input', refresh);
+    refresh();
   })();
 
   // ---------- Reschedule from the day list ----------

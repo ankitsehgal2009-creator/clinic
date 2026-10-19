@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Activity;
 use App\Models\Chair;
 use App\Models\Clinic;
+use App\Models\TreatmentPrice;
 use App\Models\User;
 use App\Support\Fmt;
 use Illuminate\Http\Request;
@@ -98,7 +99,9 @@ class AuthController extends Controller
             $clinic = Clinic::create([
                 'name' => $c['name'], 'address' => $c['address'], 'city' => $c['city'], 'phone' => $c['phone'],
                 'gstin' => $c['gstin'] ? strtoupper($c['gstin']) : null, 'patient_prefix' => $c['prefix'],
+                'invoice_prefix' => TreatmentPrice::prefixFrom($c['prefix']),
             ]);
+            TreatmentPrice::seedDefaults($clinic->id);
             for ($i = 1; $i <= $c['chairs']; $i++) {
                 Chair::create(['clinic_id' => $clinic->id, 'name' => "Chair $i"]);
             }

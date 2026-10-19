@@ -12,6 +12,7 @@
   <div class="card kpi"><span class="l">Today's appointments</span><span class="v">{{ $live }}</span><span class="muted">{{ $count('COMPLETED') }} done · {{ $count('WAITING') }} waiting</span></div>
   <div class="card kpi"><span class="l">In chair now</span><span class="v">{{ $count('IN_CHAIR') }}</span></div>
   <div class="card kpi"><span class="l">New patients this month</span><span class="v">{{ $newThisMonth }}</span></div>
+  @if ($collected !== null)<a class="card kpi" href="{{ route('billing.index') }}" style="color:inherit;text-decoration:none"><span class="l">Collected today</span><span class="v">{{ \App\Support\Money::inr($collected) }}</span></a>@endif
   <div class="card kpi"><span class="l">All patients</span><span class="v">{{ number_format($total) }}</span></div>
 </div>
 <div class="card">

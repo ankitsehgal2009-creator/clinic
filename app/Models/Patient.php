@@ -18,6 +18,17 @@ class Patient extends Model
         return $this->hasMany(Appointment::class);
     }
 
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    /** Unpaid balance across all bills that aren't cancelled, in paise. */
+    public function balance(): int
+    {
+        return (int) $this->invoices()->whereNull('cancelled_at')->sum(\Illuminate\Support\Facades\DB::raw('total - paid'));
+    }
+
     public function relativeLabel(): ?string
     {
         if (! $this->relative_name) {

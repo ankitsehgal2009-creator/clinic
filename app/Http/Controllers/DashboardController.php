@@ -20,6 +20,7 @@ class DashboardController extends Controller
             'count' => fn ($s) => $appts->where('status', $s)->count(),
             'newThisMonth' => Patient::where('clinic_id', $me->clinic_id)->where('created_at', '>=', date('Y-m-01 00:00:00'))->count(),
             'total' => Patient::where('clinic_id', $me->clinic_id)->count(),
+            'collected' => $me->canOpen('billing') ? (int) \App\Models\Payment::where('clinic_id', $me->clinic_id)->where('date', $today)->sum('amount') : null,
         ]);
     }
 }
