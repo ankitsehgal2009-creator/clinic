@@ -1,0 +1,12 @@
+# Only used when the whole SmileDesk folder sits inside the website folder
+# (when the domain's document root cannot point at the public folder).
+# Sends every request into public/ and blocks the app's own files.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(\.env.*|\.git.*|composer\.(json|lock)|artisan|README\.md|INSTALL\.md)$ - [F,L]
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|vendor)(/.*)?$ - [F,L]
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+<Files ".env">
+    Require all denied
+</Files>

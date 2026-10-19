@@ -1,0 +1,1 @@
+<span class="av" @if(!empty($size)) style="width:{{ $size }}px;height:{{ $size }}px;font-size:{{ intdiv($size, 3) }}px" @endif>@if(!empty($photo))<img src="{{ $photo }}" alt="">@else{{ \App\Support\Fmt::initials($name) }}@endif</span>

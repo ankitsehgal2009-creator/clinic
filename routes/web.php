@@ -1,0 +1,69 @@
+<?php
+
+use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\ApiController;
+use App\Http\Controllers\AppointmentController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ImportController;
+use App\Http\Controllers\PatientController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\StaffController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', fn () => redirect(auth()->check() ? auth()->user()->homeUrl() : '/login'));
+
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::get('/setup', [AuthController::class, 'showSetup'])->name('setup');
+    Route::post('/setup', [AuthController::class, 'setup'])->middleware('throttle:5,1');
+});
+
+Route::middleware(['auth', 'page'])->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::view('/no-access', 'no-access')->name('no-access');
+
+    Route::get('/dashboard', DashboardController::class)->middleware('page:dashboard')->name('dashboard');
+
+    Route::middleware('page:appointments')->group(function () {
+        Route::get('/appointments', [AppointmentController::class, 'index'])->name('appointments.index');
+        Route::get('/appointments/new', [AppointmentController::class, 'create'])->name('appointments.create');
+        Route::post('/appointments', [AppointmentController::class, 'store'])->name('appointments.store');
+        Route::post('/appointments/{appointment}/status', [AppointmentController::class, 'status'])->name('appointments.status');
+        Route::post('/appointments/{appointment}/move', [AppointmentController::class, 'move'])->name('appointments.move');
+        Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy'])->name('appointments.destroy');
+        Route::get('/api/slots', [ApiController::class, 'slots']);
+        Route::get('/api/appointments/counts', [ApiController::class, 'counts']);
+        Route::get('/api/patients/search', [ApiController::class, 'search']);
+    });
+
+    Route::middleware('page:import')->group(function () {
+        Route::get('/patients/import', [ImportController::class, 'show'])->name('import.show');
+        Route::post('/patients/import/read', [ImportController::class, 'read'])->name('import.read');
+        Route::post('/patients/import', [ImportController::class, 'store'])->name('import.store');
+    });
+
+    Route::middleware('page:patients')->group(function () {
+        Route::get('/patients', [PatientController::class, 'index'])->name('patients.index');
+        Route::get('/patients/new', [PatientController::class, 'create'])->name('patients.create');
+        Route::post('/patients', [PatientController::class, 'store'])->name('patients.store');
+        Route::get('/patients/{patient}', [PatientController::class, 'show'])->name('patients.show');
+        Route::post('/patients/{patient}/active', [PatientController::class, 'active'])->name('patients.active');
+        Route::delete('/patients/{patient}', [PatientController::class, 'destroy'])->name('patients.destroy');
+    });
+
+    Route::middleware('page:staff')->group(function () {
+        Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+        Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+        Route::post('/staff/{user}/active', [StaffController::class, 'active'])->name('staff.active');
+        Route::post('/staff/{user}/pages', [StaffController::class, 'pages'])->name('staff.pages');
+    });
+
+    Route::get('/activity', ActivityController::class)->middleware('page:activity')->name('activity');
+
+    Route::middleware('page:settings')->group(function () {
+        Route::get('/settings', [SettingsController::class, 'show'])->name('settings');
+        Route::post('/settings', [SettingsController::class, 'save']);
+    });
+});
