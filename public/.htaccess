@@ -1,7 +1,5 @@
 <IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
+    # No "Options" line here: shared hosts like StackCP refuse it with a 500 error.
 
     RewriteEngine On
 
