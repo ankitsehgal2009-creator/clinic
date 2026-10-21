@@ -53,5 +53,6 @@
     </section>
     <div><button class="btn pri">Finish setup</button></div>
   </form>
+  @include('partials.credit')
 </div>
 @endsection

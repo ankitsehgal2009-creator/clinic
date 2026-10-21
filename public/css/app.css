@@ -495,3 +495,8 @@ html.theming,html.theming *{transition:background-color .4s,color .4s,border-col
 .pub-tick svg{width:34px;height:34px;fill:none;stroke:#ffffff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24;animation:draw .5s .3s var(--ease-out) forwards}
 .pub-foot{text-align:center;font-size:12px;color:var(--muted);margin-top:18px}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+/* Credit line: page footer on screen, small line at the bottom of printouts */
+.credit{margin:28px 0 4px;text-align:center;font-size:12px;color:var(--muted);letter-spacing:.01em}
+.lg-card .credit,.lg .credit{margin:18px 0 0}
+.print-credit{margin-top:14px;text-align:center;font-size:9.5px;color:#8a8f94;letter-spacing:.02em}
+.qrcard .print-credit{margin-top:6px}

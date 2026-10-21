@@ -166,5 +166,6 @@
     <p>No payments on this day.</p>
   @endif
   <div class="signs"><div>Counted by</div><div>Checked by</div></div>
+  <div class="print-credit">Designed &amp; Developed By Er. Ankit Sehgal</div>
 </div>
 @endsection

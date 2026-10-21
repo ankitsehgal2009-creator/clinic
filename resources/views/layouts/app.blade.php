@@ -30,6 +30,7 @@
     <main class="content">
       @include('partials.flash')
       @yield('content')
+      @include('partials.credit', ['cls' => 'noprint'])
     </main>
   </div>
 </div>

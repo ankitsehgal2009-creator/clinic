@@ -42,6 +42,6 @@
       <p class="hint" style="text-align:center;margin:0">Your details go only to {{ $c->name }}.</p>
     </form>
   @endif
-  <p class="pub-foot">Booking by SmileDesk</p>
+  <p class="pub-foot">Booking by SmileDesk<br>Designed &amp; Developed By Er. Ankit Sehgal</p>
 </div>
 @endsection

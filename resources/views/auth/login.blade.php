@@ -38,6 +38,7 @@
       <button class="btn pri lg-btn lg-in" style="--d:.25s" data-login-btn><span>Sign in</span><i class="spin" aria-hidden="true"></i></button>
       <p class="hint lg-in" style="--d:.3s;margin:0;text-align:center">New clinic? <a href="{{ route('setup') }}">Set up your clinic</a></p>
     </form>
+    @include('partials.credit', ['cls' => 'lg-in'])
   </div>
 </div>
 @endsection

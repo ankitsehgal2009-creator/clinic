@@ -54,6 +54,7 @@
     @if ($inv->notes)<p class="sm">Note: {{ $inv->notes }}</p>@endif
     @if ($c->gstin)<p class="sm">Healthcare services by a clinical establishment are exempt from GST.{{ $hasGst ? ' Cosmetic procedures are taxed (CGST + SGST).' : '' }}</p>@endif
     <div class="sign"><div>For {{ $c->name }}</div></div>
+    <div class="print-credit">Designed &amp; Developed By Er. Ankit Sehgal</div>
   </div>
 
   <div class="stack noprint">

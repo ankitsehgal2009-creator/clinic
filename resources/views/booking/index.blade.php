@@ -32,6 +32,7 @@
       <span class="qr-small">Scan with your phone camera</span>
       <span class="qr-link mono" data-link-text>{{ $link }}</span>
       <span class="qr-small">{{ $c->phone }}</span>
+      <div class="print-credit">Designed &amp; Developed By Er. Ankit Sehgal</div>
     </div>
     <p class="hint">Print it for reception, or share the picture on WhatsApp, Instagram or your Google profile.</p>
     <div class="row" style="justify-content:center"><button type="button" class="btn pri" data-print="#qrcard" data-paper="A5" data-isolate>Print QR card</button><button type="button" class="btn" data-qr-download="{{ \Illuminate\Support\Str::slug($c->name) }}-booking-qr.png">Download picture</button></div>

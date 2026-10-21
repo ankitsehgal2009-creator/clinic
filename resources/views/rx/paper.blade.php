@@ -18,6 +18,7 @@
   @include('rx.meds', ['meds' => $meds, 'num' => false])
   @if ($v['advice'])<p class="sm"><b>Advice:</b> {!! nl2br(e($v['advice'])) !!}</p>@endif
   <div class="rx-foot rm-foot">@if ($next)<span class="rm-next">Next visit · {{ $next }}</span>@else<span></span>@endif<div class="sign"><div>{{ $doc?->name ?? 'Doctor' }}</div></div></div>
+<div class="print-credit">Designed &amp; Developed By Er. Ankit Sehgal</div>
 </div>
 @elseif ($d === 'minimal')
 <div class="paper rx rx-min">
@@ -34,6 +35,7 @@
   @if ($next)<p class="sm">Next visit {{ $next }}</p>@endif
   <div class="sign"><div>{{ $doc?->name ?? 'Doctor' }}</div></div>
   <div class="sm mn-f">{{ $c->address }}, {{ $c->city }} · {{ $c->phone }}</div>
+<div class="print-credit">Designed &amp; Developed By Er. Ankit Sehgal</div>
 </div>
 @elseif ($d === 'bilingual')
 <div class="paper rx rx-trad"><div class="tr-in">
@@ -49,6 +51,7 @@
   @if ($v['advice'])<p class="sm"><b>सलाह / Advice:</b> {!! nl2br(e($v['advice'])) !!}</p>@endif
   @if ($next)<p class="sm"><b>अगली विज़िट / Next visit:</b> {{ $next }}</p>@endif
   <div class="rx-foot"><div class="tr-stamp">Clinic stamp</div><div class="sign"><div>हस्ताक्षर / Signature</div></div></div>
+<div class="print-credit">Designed &amp; Developed By Er. Ankit Sehgal</div>
 </div></div>
 @else
 <div class="paper rx">
@@ -62,5 +65,6 @@
   @if ($v['advice'])<p class="sm" style="margin-top:12px"><b class="ink">Advice:</b> {!! nl2br(e($v['advice'])) !!}</p>@endif
   @if ($next)<p class="sm"><b class="ink">Next visit:</b> {{ $next }}</p>@endif
   <div class="sign"><div>{{ $doc?->name ?? 'Doctor' }}</div></div>
+<div class="print-credit">Designed &amp; Developed By Er. Ankit Sehgal</div>
 </div>
 @endif
