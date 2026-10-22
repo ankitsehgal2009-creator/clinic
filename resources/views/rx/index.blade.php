@@ -4,7 +4,7 @@
 @section('content')
 <div class="ph">
   <div><h1>Prescriptions</h1><p>Each visit keeps the doctor's notes and the prescription printed from it. {{ $today }} {{ $today === 1 ? 'visit' : 'visits' }} today.</p></div>
-  <div class="row"><a class="btn" href="{{ route('rx.templates') }}">Templates</a><a class="btn pri" href="{{ route('rx.create') }}">+ New visit</a></div>
+  <div class="row"><a class="btn" href="{{ route('rx.procedures') }}">Procedures</a><a class="btn" href="{{ route('rx.templates') }}">Templates</a><a class="btn pri" href="{{ route('rx.create') }}">+ New visit</a></div>
 </div>
 <form class="row" style="margin-bottom:14px"><input name="q" class="inp" style="max-width:340px" value="{{ $term }}" placeholder="Search by patient name, ID or mobile" aria-label="Search"><button class="btn">Search</button>@if ($term)<a class="btn" href="{{ route('rx.index') }}">Clear</a>@endif</form>
 <div class="tw"><table>

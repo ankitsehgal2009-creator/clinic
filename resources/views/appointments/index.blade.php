@@ -84,14 +84,16 @@
 @endif
 
 @if ($view === 'month')
-<p class="muted" style="margin-top:-6px">Dates in <b style="color:var(--ink)">bold</b> have one or more appointments. Tap a date to open that day.</p>
+<p class="muted" style="margin-top:-6px">Dates in <b style="color:var(--ink)">bold</b> have one or more appointments. Point at a date to see who is booked, or tap it to open that day.</p>
 <div class="month">
   @foreach (['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $w)<div class="wd">{{ $w }}</div>@endforeach
   @for ($i = 1; $i < (int) date('N', strtotime($from)); $i++)<div class="blank"></div>@endfor
   @for ($i = 1; $i <= (int) substr($to, 8); $i++)
     @php($d = substr($from, 0, 8).str_pad($i, 2, '0', STR_PAD_LEFT))
-    @php($n = $live->where('date', $d)->count())
-    <a class="{{ $n ? 'has' : '' }}" href="{{ route('appointments.index', ['date' => $d]) }}"><span class="n {{ $d === $today ? 'now' : '' }}">{{ $i }}</span>@if ($n)<div style="font-size:12px">{{ $n }} appt{{ $n > 1 ? 's' : '' }}</div>@endif</a>
+    @php($dayAppts = $live->where('date', $d))
+    @php($n = $dayAppts->count())
+    <a class="{{ $n ? 'has' : '' }}" href="{{ route('appointments.index', ['date' => $d]) }}" @if ($n) data-mtip aria-describedby="mt-{{ $i }}" @endif><span class="n {{ $d === $today ? 'now' : '' }}">{{ $i }}</span>@if ($n)<div style="font-size:12px">{{ $n }} appt{{ $n > 1 ? 's' : '' }}</div>
+      <div class="mtip" id="mt-{{ $i }}" role="tooltip"><b>{{ Fmt::date($d) }}</b>@foreach ($dayAppts as $a)<span><i class="mono">{{ Fmt::time($a->start_min) }}</i>{{ $a->patient?->name }}<small>{{ $a->treatment }}{{ $a->chair ? ' · '.$a->chair->name : '' }}</small></span>@endforeach</div>@endif</a>
   @endfor
 </div>
 @endif

@@ -19,7 +19,13 @@ class CashController extends Controller
         $me = $this->me();
         $date = Fmt::isDate($r->query('date')) && $r->query('date') <= Fmt::today() ? $r->query('date') : Fmt::today();
         $closing = CashClosing::with('closer:id,name')->where(['clinic_id' => $me->clinic_id, 'date' => $date])->first();
-        return view('cash', ['date' => $date, 'closing' => $closing] + $this->day($me->clinic_id, $date));
+        // Every bill still owed money, across all days, so reception can chase it while closing
+        $pending = \App\Models\Invoice::with('patient:id,name,code,mobile')
+            ->where('clinic_id', $me->clinic_id)->whereNull('cancelled_at')->whereColumn('paid', '<', 'total')
+            ->orderBy('date')->orderBy('id')->limit(300)->get();
+        return view('cash', ['date' => $date, 'closing' => $closing, 'pending' => $pending,
+            'pendingTotal' => (int) \App\Models\Invoice::where('clinic_id', $me->clinic_id)->whereNull('cancelled_at')->whereColumn('paid', '<', 'total')->sum(\Illuminate\Support\Facades\DB::raw('total - paid')),
+        ] + $this->day($me->clinic_id, $date));
     }
 
     /** Everything the closing needs for one day, worked out from payments and payouts. */

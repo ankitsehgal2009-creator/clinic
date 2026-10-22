@@ -106,6 +106,31 @@
     @endif
   </div>
 </div>
+<div class="card" style="margin-top:16px" id="pending">
+  <div class="row" style="justify-content:space-between;margin-bottom:8px">
+    <h2 style="margin:0">Pending payments</h2>
+    <span class="chip {{ $pendingTotal ? 'c-bad' : 'c-ok' }}">{{ $pendingTotal ? Money::inr($pendingTotal).' due from '.$pending->pluck('patient_id')->unique()->count().' '.($pending->pluck('patient_id')->unique()->count() === 1 ? 'patient' : 'patients') : 'Nothing pending' }}</span>
+  </div>
+  @if ($pending->isNotEmpty())
+    <div class="tw"><table><thead><tr><th>Bill date</th><th>Patient</th><th>Bill</th><th style="text-align:right">Total</th><th style="text-align:right">Paid</th><th style="text-align:right">Due</th><th></th></tr></thead><tbody>
+      @foreach ($pending as $inv)
+        @php($days = (int) floor((strtotime(Fmt::today()) - strtotime($inv->date)) / 86400))
+        <tr>
+          <td style="white-space:nowrap">{{ date('j M Y', strtotime($inv->date)) }}<br><small class="muted">{{ $days === 0 ? 'today' : ($days === 1 ? '1 day ago' : $days.' days ago') }}</small></td>
+          <td>@if ($me->canOpen('patients'))<a href="{{ route('patients.show', $inv->patient_id) }}">{{ $inv->patient?->name }}</a>@else{{ $inv->patient?->name }}@endif<br><small class="muted mono">{{ $inv->patient?->code }} · {{ Fmt::showMobile($inv->patient?->mobile ?? '') }}</small></td>
+          <td class="mono">{{ $inv->number }}</td>
+          <td class="mono" style="text-align:right">{{ Money::inr($inv->total) }}</td>
+          <td class="mono" style="text-align:right">{{ Money::inr($inv->paid) }}</td>
+          <td class="mono" style="text-align:right"><b class="{{ $days > 30 ? 'err' : '' }}">{{ Money::inr($inv->total - $inv->paid) }}</b></td>
+          <td style="text-align:right">@if ($me->canOpen('billing'))<a class="btn sm" href="{{ route('billing.show', $inv) }}">Collect</a>@endif</td>
+        </tr>
+      @endforeach
+    </tbody></table></div>
+    <p class="hint" style="margin:8px 0 0">All unpaid bills from every day, oldest first. Amounts due for more than 30 days are in red.</p>
+  @else
+    <p class="muted">Every bill is fully paid.</p>
+  @endif
+</div>
 {{-- One-page report used only for printing; the Print button scales it to fit the chosen paper --}}
 @php($cl = $me->clinic)
 @php($c = $closing)

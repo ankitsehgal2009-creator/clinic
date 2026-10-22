@@ -36,17 +36,17 @@ class PrescriptionController extends Controller
     {
         $me = $this->me();
         $patient = $r->query('patient') ? $this->own(Patient::findOrFail((int) $r->query('patient'))) : null;
-        return view('rx.form', $this->formData($me) + ['visit' => null, 'patient' => $patient, 'tooth' => $r->query('tooth')]);
+        return view('rx.form', $this->formData($me, $patient) + ['visit' => null, 'patient' => $patient, 'tooth' => $r->query('tooth')]);
     }
 
     public function edit(Visit $visit)
     {
         $this->own($visit);
         $visit->load('patient', 'medicines', 'files');
-        return view('rx.form', $this->formData($this->me()) + ['visit' => $visit, 'patient' => $visit->patient, 'tooth' => null]);
+        return view('rx.form', $this->formData($this->me(), $visit->patient) + ['visit' => $visit, 'patient' => $visit->patient, 'tooth' => null]);
     }
 
-    private function formData(User $me): array
+    private function formData(User $me, ?Patient $patient = null): array
     {
         $templates = RxTemplate::where('clinic_id', $me->clinic_id)->where('active', true)->orderBy('name')->get();
         return [
@@ -54,9 +54,39 @@ class PrescriptionController extends Controller
             'tplData' => $templates->mapWithKeys(fn ($t) => [$t->id => ['meds' => $t->meds, 'advice' => $t->advice]]),
             'defaultTpl' => $me->clinic->rx_template_id,
             'doctors' => User::where(['clinic_id' => $me->clinic_id, 'role' => 'DOCTOR', 'active' => true])->orderBy('name')->get(['id', 'name']),
-            'procedures' => TreatmentPrice::where('clinic_id', $me->clinic_id)->where('active', true)->orderBy('name')->pluck('name'),
+            'procedures' => \App\Models\Procedure::where('clinic_id', $me->clinic_id)->where('active', true)->orderBy('name')->pluck('name')
+                ->merge(TreatmentPrice::where('clinic_id', $me->clinic_id)->where('active', true)->pluck('name'))->unique(fn ($n) => mb_strtolower($n))->sort()->values(),
             'today' => Fmt::today(),
+            'chairs' => \App\Models\Chair::where('clinic_id', $me->clinic_id)->where('active', true)->orderBy('id')->get(['id', 'name']),
+            'upcoming' => $patient ? \App\Models\Appointment::where(['clinic_id' => $me->clinic_id, 'patient_id' => $patient->id])->where('date', '>=', Fmt::today())->where('status', '!=', 'CANCELLED')->orderBy('date')->orderBy('start_min')->limit(3)->get(['date', 'start_min']) : collect(),
         ];
+    }
+
+    /** Checks the next-visit slot before anything is saved. Returns [error, booking data]. */
+    private function nextBooking(Request $r, User $me, array $v): array
+    {
+        if (! $r->boolean('book_next') || ! $me->canOpen('appointments')) {
+            return [null, null];
+        }
+        if (empty($v['next_visit'])) {
+            return ['Pick the next visit date to book the appointment.', null];
+        }
+        if (! $r->filled('appt_min')) {
+            return ['Pick a free time for the next visit, or untick "Book the appointment".', null];
+        }
+        $b = ['date' => $v['next_visit'], 'chair_id' => (int) $r->input('appt_chair'), 'start_min' => (int) $r->input('appt_min'), 'treatment' => mb_substr(trim((string) $r->input('appt_treatment')) ?: 'Follow-up', 0, 100)];
+        $problem = AppointmentController::checkSlot($me->clinic, $b['date'], $b['chair_id'], $b['start_min']);
+        return [$problem, $problem ? null : $b];
+    }
+
+    private function bookNext(User $me, Patient $patient, ?int $doctorId, ?array $b): string
+    {
+        if (! $b) {
+            return '';
+        }
+        \App\Models\Appointment::create($b + ['clinic_id' => $me->clinic_id, 'patient_id' => $patient->id, 'doctor_id' => $doctorId, 'duration' => $me->clinic->slot_minutes]);
+        Activity::log($me, 'Booked appointment', "$patient->name · ".Fmt::date($b['date']).' '.Fmt::time($b['start_min']).' · from visit');
+        return ' Next visit booked for '.Fmt::date($b['date']).' at '.Fmt::time($b['start_min']).'.';
     }
 
     public function store(Request $r)
@@ -64,6 +94,10 @@ class PrescriptionController extends Controller
         $me = $this->me();
         [$v, $meds] = $this->validated($r);
         $patient = $this->own(Patient::findOrFail($v['patient_id']));
+        [$problem, $booking] = $this->nextBooking($r, $me, $v);
+        if ($problem) {
+            return back()->withInput()->with('error', $problem);
+        }
         $visit = DB::transaction(function () use ($me, $v, $meds) {
             $visit = Visit::create($v + ['clinic_id' => $me->clinic_id, 'created_by' => $me->id]);
             $visit->medicines()->createMany($meds);
@@ -73,7 +107,8 @@ class PrescriptionController extends Controller
             return $visit;
         });
         Activity::log($me, 'Saved visit', "$patient->name · ".($v['procedure'] ?: $v['complaint'] ?: 'Visit').' · '.count($meds).' medicines');
-        return redirect()->route('rx.show', $visit)->with('ok', 'Visit saved. Print the prescription below.');
+        $booked = $this->bookNext($me, $patient, $visit->doctor_id, $booking);
+        return redirect()->route('rx.show', $visit)->with('ok', 'Visit saved.'.$booked.' Print the prescription below.');
     }
 
     public function update(Request $r, Visit $visit)
@@ -82,13 +117,18 @@ class PrescriptionController extends Controller
         $me = $this->me();
         [$v, $meds] = $this->validated($r);
         unset($v['patient_id']);
+        [$problem, $booking] = $this->nextBooking($r, $me, $v);
+        if ($problem) {
+            return back()->withInput()->with('error', $problem);
+        }
         DB::transaction(function () use ($visit, $v, $meds) {
             $visit->update($v);
             $visit->medicines()->delete();
             $visit->medicines()->createMany($meds);
         });
         Activity::log($me, 'Changed visit', $visit->patient->name.' · '.Fmt::date($visit->date));
-        return redirect()->route('rx.show', $visit)->with('ok', 'Visit updated.');
+        $booked = $this->bookNext($me, $visit->patient, $visit->doctor_id, $booking);
+        return redirect()->route('rx.show', $visit)->with('ok', 'Visit updated.'.$booked);
     }
 
     /** Visit fields and the medicine rows that have a name. */
@@ -138,6 +178,45 @@ class PrescriptionController extends Controller
         return view('rx.show', ['visit' => $visit, 'design' => $design, 'c' => $this->me()->clinic]);
     }
 
+    // ---------- Procedure list ----------
+
+    public function procedures()
+    {
+        $me = $this->me();
+        return view('rx.procedures', ['all' => \App\Models\Procedure::where('clinic_id', $me->clinic_id)->orderByDesc('active')->orderBy('name')->get()]);
+    }
+
+    public function addProcedure(Request $r)
+    {
+        $me = $this->me();
+        $name = trim(preg_replace('/\s+/', ' ', (string) $r->validate(['name' => 'required|string|min:2|max:120'])['name']));
+        $found = \App\Models\Procedure::where('clinic_id', $me->clinic_id)->where('name', $name)->first();
+        if ($found) {
+            $found->update(['active' => true]);
+            return back()->with('ok', "$name is already in the list and is turned on.");
+        }
+        \App\Models\Procedure::create(['clinic_id' => $me->clinic_id, 'name' => $name]);
+        Activity::log($me, 'Added procedure', $name);
+        return back()->with('ok', "$name added.");
+    }
+
+    public function procedureActive(Request $r, \App\Models\Procedure $procedure)
+    {
+        $this->own($procedure);
+        $procedure->update(['active' => $r->boolean('active')]);
+        Activity::log($this->me(), $procedure->active ? 'Turned on procedure' : 'Turned off procedure', $procedure->name);
+        return response()->json(['ok' => true]);
+    }
+
+    public function destroyProcedure(\App\Models\Procedure $procedure)
+    {
+        $this->own($procedure);
+        abort_unless($this->me()->isAdmin(), 403, 'Only the admin can delete permanently.');
+        $procedure->delete();
+        Activity::log($this->me(), 'Deleted procedure', $procedure->name);
+        return back()->with('ok', "$procedure->name deleted. Old visits keep it.");
+    }
+
     // ---------- Templates ----------
 
     public function templates(Request $r)
@@ -172,6 +251,9 @@ class PrescriptionController extends Controller
         } else {
             $template = RxTemplate::create($data + ['clinic_id' => $me->clinic_id]);
             Activity::log($me, 'Added prescription template', $template->name);
+        }
+        if ($r->expectsJson()) {
+            return response()->json(['id' => $template->id, 'name' => $template->name, 'meds' => $template->meds, 'advice' => $template->advice]);
         }
         return redirect()->route('rx.templates', ['t' => $template->id])->with('ok', "$template->name saved.");
     }

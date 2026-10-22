@@ -1,5 +1,6 @@
 @extends('layouts.app')
 @use('App\Support\Rx')
+@use('App\Support\Fmt')
 @php($me = auth()->user())
 @php($oldMeds = old('meds', $visit ? $visit->medicines->map(fn ($m) => $m->only(['name', 'form', 'dose', 'timing', 'days']))->all() : null))
 @section('title', ($visit ? 'Edit visit' : 'New visit').' · SmileDesk')
@@ -28,10 +29,26 @@
     <div class="form">
       <div class="field full"><label for="cc">Chief complaint</label><input id="cc" name="complaint" class="inp" maxlength="250" value="{{ old('complaint', $visit->complaint ?? '') }}" placeholder="e.g. Pain in lower left back tooth for 3 days"></div>
       <div class="field"><label for="tt">Tooth</label><input id="tt" name="teeth" class="inp mono" maxlength="60" value="{{ old('teeth', $visit->teeth ?? $tooth) }}" placeholder="e.g. 36, 37"><span class="hint">FDI numbers. The tooth chart shows this visit under each tooth.</span></div>
-      <div class="field"><label for="pr">Procedure done</label><input id="pr" name="procedure" class="inp" list="proc-names" maxlength="250" value="{{ old('procedure', $visit->procedure ?? '') }}" placeholder="Pick or type"><datalist id="proc-names">@foreach ($procedures as $p)<option value="{{ $p }}">@endforeach</datalist></div>
+      <div class="field"><label for="pr">Procedure done</label><input id="pr" name="procedure" class="inp" list="proc-names" maxlength="250" value="{{ old('procedure', $visit->procedure ?? '') }}" placeholder="Pick or type"><a class="hint" href="{{ route('rx.procedures') }}" target="_blank" rel="noopener">Edit this list</a><datalist id="proc-names">@foreach ($procedures as $p)<option value="{{ $p }}">@endforeach</datalist></div>
       <div class="field full"><label for="fd">Findings</label><textarea id="fd" name="findings" class="inp" rows="3" maxlength="3000">{{ old('findings', $visit->findings ?? '') }}</textarea><span class="hint">Kept in the patient's record. Not printed on the prescription.</span></div>
       <div class="field"><label for="dg">Diagnosis</label><input id="dg" name="diagnosis" class="inp" maxlength="250" value="{{ old('diagnosis', $visit->diagnosis ?? '') }}" placeholder="e.g. Irreversible pulpitis"></div>
-      <div class="field"><span class="lbl">Next visit</span><div data-datepicker data-clearable data-name="next_visit" data-placeholder="No next visit" data-value="{{ old('next_visit', $visit->next_visit ?? '') }}" data-min="{{ $today }}"></div></div>
+      <div class="field"><span class="lbl">Next visit</span><div data-datepicker data-clearable data-name="next_visit" data-placeholder="No next visit" data-value="{{ old('next_visit', $visit->next_visit ?? '') }}" data-min="{{ $today }}" data-next-date></div></div>
+      @if ($me->canOpen('appointments') && $chairs->isNotEmpty())
+      <div class="field full nextbook {{ old('next_visit', $visit->next_visit ?? '') ? '' : 'hide' }}" data-nextbook data-old-min="{{ old('appt_min') }}">
+        <div class="row" style="justify-content:space-between">
+          <label class="chk"><input type="checkbox" name="book_next" value="1" data-book-next @checked(old('book_next'))> <b>Book the appointment for the next visit now</b></label>
+          @if ($upcoming->isNotEmpty())<span class="hint">Already booked: {{ $upcoming->map(fn ($a) => Fmt::date($a->date).' '.Fmt::time($a->start_min))->implode(', ') }}</span>@endif
+        </div>
+        <div class="nb-body {{ old('book_next') ? '' : 'hide' }}" data-nb-body>
+          <div class="form" style="margin-top:10px">
+            <div class="field"><label for="nbch">Chair</label><select id="nbch" name="appt_chair" class="inp" data-nb-chair>@foreach ($chairs as $ch)<option value="{{ $ch->id }}" @selected((string) old('appt_chair') === (string) $ch->id)>{{ $ch->name }}</option>@endforeach</select></div>
+            <div class="field"><label for="nbt">Treatment</label><input id="nbt" name="appt_treatment" class="inp" list="nb-treat" maxlength="100" value="{{ old('appt_treatment', 'Follow-up') }}"><datalist id="nb-treat">@foreach (\App\Support\Status::TREATMENTS as $t)<option value="{{ $t }}">@endforeach</datalist></div>
+          </div>
+          <input type="hidden" name="appt_min" value="{{ old('appt_min') }}" data-nb-min>
+          <div data-nb-slots style="margin-top:8px"></div>
+        </div>
+      </div>
+      @endif
     </div>
   </div>
 
@@ -42,7 +59,7 @@
         <select id="tpl" name="rx_template_id" class="inp" style="width:auto" data-tpl>
           <option value="">None</option>
           @foreach ($templates as $t)<option value="{{ $t->id }}" @selected((string) old('rx_template_id', $visit->rx_template_id ?? '') === (string) $t->id)>{{ $t->name }}{{ $defaultTpl === $t->id ? ' (default)' : '' }}</option>@endforeach
-        </select></div>
+        </select><a class="btn sm" href="{{ route('rx.templates') }}" target="_blank" rel="noopener">Manage templates</a></div>
     </div>
     <datalist id="rx-forms">@foreach (Rx::FORMS as $f)<option value="{{ $f }}">@endforeach</datalist>
     <datalist id="rx-timings">@foreach (Rx::TIMINGS as $f)<option value="{{ $f }}">@endforeach</datalist>
@@ -55,7 +72,7 @@
       <td style="width:100px"><input class="inp" data-f="days" placeholder="5 days" aria-label="Days"></td>
       <td><button type="button" class="btn sm" data-del aria-label="Remove medicine">✕</button></td>
     </tr></template>
-    <button type="button" class="btn" style="margin-top:12px" data-add>+ Add medicine</button>
+    <div class="row" style="margin-top:12px"><button type="button" class="btn" data-add>+ Add medicine</button><button type="button" class="btn" data-save-tpl="{{ route('rx.templates.store') }}">Save as new template</button></div>
     <p class="hint">Dose is morning-afternoon-night, so 1-0-1 means one in the morning and one at night.</p>
     <div class="field" style="margin-top:8px"><label for="adv">Advice printed below the medicines</label><textarea id="adv" name="advice" class="inp" rows="2" maxlength="2000" data-advice>{{ old('advice', $visit->advice ?? '') }}</textarea></div>
     <div class="field" style="margin-top:12px;max-width:320px"><label for="ds">Print design</label><select id="ds" name="design" class="inp">@foreach (Rx::DESIGNS as $k => [$n, $why])<option value="{{ $k }}" @selected(old('design', $visit->design ?? $me->clinic->rx_design) === $k)>{{ $n }}{{ $me->clinic->rx_design === $k ? ' (clinic default)' : '' }}</option>@endforeach</select></div>

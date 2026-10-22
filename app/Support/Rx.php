@@ -32,6 +32,20 @@ class Rx
         return ['Tablet' => 'Tab. ', 'Capsule' => 'Cap. ', 'Syrup' => 'Syp. ', 'Injection' => 'Inj. ', 'Ointment' => 'Oint. '][$form] ?? '';
     }
 
+    /** Starter list for "Procedure done". Each clinic can add more or turn these off. */
+    public const PROCEDURES = [
+        'Consultation', 'Oral prophylaxis (scaling)', 'Composite filling', 'GIC filling', 'Root canal treatment (RCT)',
+        'RCT sitting: access opening', 'RCT sitting: cleaning and shaping', 'RCT sitting: obturation', 'Pulpectomy',
+        'Extraction', 'Surgical extraction', 'Wisdom tooth removal', 'Crown preparation', 'Crown cementation',
+        'Bridge', 'Denture', 'Implant', 'Teeth whitening', 'Braces adjustment', 'IOPA X-ray', 'Fluoride application', 'Follow-up',
+    ];
+
+    public static function seedProcedures(int $clinicId): void
+    {
+        $now = now();
+        DB::table('procedures')->insert(array_map(fn ($n) => ['clinic_id' => $clinicId, 'name' => $n, 'active' => true, 'created_at' => $now, 'updated_at' => $now], self::PROCEDURES));
+    }
+
     /** Adds the starter templates to a clinic and makes Post RCT the default. */
     public static function seedTemplates(int $clinicId): void
     {

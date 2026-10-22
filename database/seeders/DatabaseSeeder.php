@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
         $c = Clinic::create(['name' => 'Smile Craft Dental Clinic', 'address' => 'Shop 4, Sea Breeze CHS, Lokhandwala Road, Andheri West', 'city' => 'Mumbai 400053', 'phone' => '022 2632 4410', 'gstin' => '27AAKFS4821M1Z6', 'patient_prefix' => 'SC-', 'invoice_prefix' => 'SC']);
         TreatmentPrice::seedDefaults($c->id);
         Rx::seedTemplates($c->id);
+        Rx::seedProcedures($c->id);
         $c->update(['booking_slug' => 'smilecraft', 'booking_on' => true]);
         $chairs = collect([1, 2, 3])->map(fn ($n) => Chair::create(['clinic_id' => $c->id, 'name' => "Chair $n"]));
         $admin = User::create(['clinic_id' => $c->id, 'name' => 'Vikram Mehta', 'username' => 'vikram', 'mobile' => '9820077134', 'role' => 'ADMIN', 'password' => 'demo1234']);

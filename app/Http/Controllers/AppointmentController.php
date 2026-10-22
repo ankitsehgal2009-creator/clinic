@@ -116,7 +116,7 @@ class AppointmentController extends Controller
     }
 
     /** A readable message if the slot is outside hours, in the past or already taken; null when it is free. */
-    private function checkSlot(Clinic $clinic, string $date, int $chairId, int $start, ?int $ignoreId = null): ?string
+    public static function checkSlot(Clinic $clinic, string $date, int $chairId, int $start, ?int $ignoreId = null): ?string
     {
         if (! in_array($start, $clinic->slots(), true)) {
             return 'That time is outside clinic hours.';

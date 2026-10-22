@@ -91,6 +91,10 @@ Route::middleware(['auth', 'page'])->group(function () {
         Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('rx.index');
         Route::get('/prescriptions/new', [PrescriptionController::class, 'create'])->name('rx.create');
         Route::post('/prescriptions', [PrescriptionController::class, 'store'])->name('rx.store');
+        Route::get('/prescriptions/procedures', [PrescriptionController::class, 'procedures'])->name('rx.procedures');
+        Route::post('/prescriptions/procedures', [PrescriptionController::class, 'addProcedure'])->name('rx.procedures.store');
+        Route::post('/prescriptions/procedures/{procedure}/active', [PrescriptionController::class, 'procedureActive'])->name('rx.procedures.active');
+        Route::delete('/prescriptions/procedures/{procedure}', [PrescriptionController::class, 'destroyProcedure'])->name('rx.procedures.destroy');
         Route::get('/prescriptions/templates', [PrescriptionController::class, 'templates'])->name('rx.templates');
         Route::post('/prescriptions/templates', [PrescriptionController::class, 'saveTemplate'])->name('rx.templates.store');
         Route::post('/prescriptions/templates/{template}', [PrescriptionController::class, 'saveTemplate'])->name('rx.templates.update');

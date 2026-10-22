@@ -139,23 +139,45 @@
       value: d.value, name: d.name, birth: 'birth' in d, plain: 'plain' in d, clearable: 'clearable' in d, placeholder: d.placeholder, min: d.min, max: d.max,
       onChange: function (k) {
         if (d.go) location.href = d.go + (d.go.indexOf('?') < 0 ? '?' : '&') + 'date=' + k;
-        var age = $('[data-age-field]');
-        if ('birth' in d && age) age.classList.toggle('hide', !!k);
+        if ('birth' in d) fillAge(k);
         host.dispatchEvent(new CustomEvent('datechange', { detail: k, bubbles: true }));
       },
     });
-    if ('birth' in d && d.value) { var age = $('[data-age-field]'); if (age) age.classList.add('hide'); }
+    if ('birth' in d) fillAge(d.value);
   });
+  // Age follows the date of birth: filled in and locked while a date of birth is picked
+  function fillAge(dob) {
+    var box = $('[data-age-field]'); if (!box) return;
+    var inp = $('input', box), lbl = $('label', box);
+    if (dob) {
+      var p = dob.split('-').map(Number), t = todayKey().split('-').map(Number);
+      var y = t[0] - p[0] - ((t[1] < p[1] || (t[1] === p[1] && t[2] < p[2])) ? 1 : 0);
+      inp.value = Math.max(0, y); inp.readOnly = true; lbl.textContent = 'Age (from date of birth)';
+    } else { inp.readOnly = false; lbl.textContent = 'Or age in years'; }
+    box.classList.toggle('auto', !!dob);
+  }
 
   // ---------- Slot picker: 15-minute slots for one chair and day, Free (default) or Taken ----------
   function slotPicker(host, onChange, url) {
     var view = 'free', slots = null, value = null, req = 0, err = '';
     function draw() {
       var h = '<div class="row" style="justify-content:space-between"><span class="lbl">Time</span>' +
-        '<select class="inp" style="width:auto;padding:4px 8px" aria-label="Show slots" data-view><option value="free"' + (view === 'free' ? ' selected' : '') + '>Free slots</option><option value="taken"' + (view === 'taken' ? ' selected' : '') + '>Taken slots</option></select></div>';
+        '<select class="inp" style="width:auto;padding:4px 8px" aria-label="Show slots" data-view>' + [['all', 'All slots'], ['free', 'Free slots'], ['taken', 'Taken slots']].map(function (o) { return '<option value="' + o[0] + '"' + (view === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
       if (err) h += '<div class="err">' + esc(err) + '</div>';
       else if (!slots) h += '<p class="muted">Loading slots…</p>';
-      else if (view === 'free') {
+      else if (view === 'all') {
+        // Every slot of the day: free ones can be picked, taken ones show who has them, past ones are greyed
+        [['Morning', slots.filter(function (s) { return s.m < 900; })], ['Evening', slots.filter(function (s) { return s.m >= 900; })]].forEach(function (g) {
+          if (!g[1].length) return;
+          var nFree = g[1].filter(function (s) { return !s.taken && !s.past; }).length;
+          h += '<div style="margin-top:6px"><small class="muted">' + g[0] + ' · ' + nFree + ' free · ' + g[1].filter(function (s) { return s.taken; }).length + ' taken</small><div class="slots2">' +
+            g[1].map(function (s) {
+              if (s.taken) return '<span class="taken" title="' + esc(s.taken) + '"><b>' + fmtTime(s.m) + '</b>' + esc(s.taken) + '</span>';
+              if (s.past) return '<span class="past">' + fmtTime(s.m) + '</span>';
+              return '<button type="button" data-m="' + s.m + '" class="' + (value === s.m ? 'on' : '') + '">' + fmtTime(s.m) + '</button>';
+            }).join('') + '</div></div>';
+        });
+      } else if (view === 'free') {
         var free = slots.filter(function (s) { return !s.taken && !s.past; });
         [['Morning', free.filter(function (s) { return s.m < 900; })], ['Evening', free.filter(function (s) { return s.m >= 900; })]].forEach(function (g) {
           h += '<div style="margin-top:6px"><small class="muted">' + g[0] + ' · ' + g[1].length + ' free</small><div class="slots2">' +
@@ -748,6 +770,9 @@
       return tr;
     }
     function set(list) { body.innerHTML = ''; (list || []).forEach(add); if (!body.children.length) add(); }
+    function rowsNow() {
+      return [].map.call(body.children, function (tr) { var v = {}; $$('[data-f]', tr).forEach(function (i) { v[i.dataset.f] = i.value.trim(); }); return v; }).filter(function (v) { return v.name; });
+    }
     body.addEventListener('click', function (e) {
       var d = e.target.closest('[data-del]');
       if (!d) return;
@@ -755,7 +780,7 @@
       if (!body.children.length) add();
     });
     $('[data-add]', form).addEventListener('click', function () { $('[data-f="name"]', add()).focus(); });
-    return { set: set, add: add };
+    return { set: set, add: add, get: rowsNow };
   }
 
   var rxForm = $('#rxform');
@@ -775,6 +800,37 @@
     else rows.set([]);
     sel.addEventListener('change', function () { if (sel.value) load(sel.value); });
     rxForm.addEventListener('submit', function () { $('[data-save]', rxForm).disabled = true; });
+    // Next visit: optionally book the appointment right here
+    var nb = $('[data-nextbook]', rxForm);
+    if (nb) (function () {
+      var tick = $('[data-book-next]', nb), body = $('[data-nb-body]', nb), chair = $('[data-nb-chair]', nb), min = $('[data-nb-min]', nb);
+      var dateHost = $('[data-next-date]', rxForm), first = nb.dataset.oldMin;
+      var sp = slotPicker($('[data-nb-slots]', nb), function (m) { min.value = m == null ? '' : m; });
+      function date() { var i = $('input[name="next_visit"]', rxForm); return i ? i.value : ''; }
+      function load() {
+        if (!tick.checked || !date()) return;
+        sp.load(date(), chair.value);
+        if (first) { var want = +first; first = null; setTimeout(function () { var b = $('[data-nb-slots] button[data-m="' + want + '"]', nb); if (b) b.click(); }, 600); }
+      }
+      dateHost.addEventListener('datechange', function () { nb.classList.toggle('hide', !date()); if (!date()) tick.checked = false, body.classList.add('hide'); min.value = ''; load(); });
+      tick.addEventListener('change', function () { body.classList.toggle('hide', !tick.checked); if (!tick.checked) min.value = ''; load(); });
+      chair.addEventListener('change', load);
+      load();
+    })();
+    // Save what is typed now as a new template, without leaving the visit
+    var saveTpl = $('[data-save-tpl]', rxForm);
+    if (saveTpl) saveTpl.addEventListener('click', function () {
+      var meds = rows.get();
+      if (!meds.length) return toast('Add at least one medicine first.', true);
+      var name = prompt('Name for this template, e.g. Wisdom tooth removal');
+      if (!name || !name.trim()) return;
+      saveTpl.disabled = true;
+      send('POST', saveTpl.dataset.saveTpl, { name: name.trim(), meds: meds, advice: advice.value }).then(function (t) {
+        tpls[t.id] = { meds: t.meds, advice: t.advice };
+        var o = el('option', { value: t.id }); o.textContent = t.name; sel.appendChild(o); sel.value = t.id;
+        toast('Template ' + t.name + ' saved'); pulse(saveTpl);
+      }).catch(function (e) { toast(e.message, true); }).then(function () { saveTpl.disabled = false; });
+    });
   })();
 
   var tplForm = $('#tplform');
@@ -796,7 +852,7 @@
         }).join('') + '</div><div class="row" style="flex-wrap:nowrap"><input class="inp" data-note maxlength="250" placeholder="Note, e.g. deep caries, distal" value="' + esc(m.note || '') + '" aria-label="Note for tooth ' + n + '"><button type="button" class="btn pri" data-tsave>Save</button></div>';
       }
       h += '<b style="display:block;margin-top:12px">Visits for this tooth</b>' + (hist.length ? '<ul class="thist">' + hist.map(function (v) {
-        return '<li><span class="mono muted" style="width:92px;flex:none">' + esc(v.date) + '</span><span style="flex:1">' + esc(v.what) + '</span>' + (cfg.rxShow ? '<a class="btn sm" href="' + cfg.rxShow + '/' + v.id + '">Rx</a>' : '') + '</li>';
+        return '<li><span class="mono muted" style="width:92px;flex:none">' + esc(v.date) + '</span><span style="flex:1">' + esc(v.what) + '</span>' + (cfg.rxShow ? '<a class="btn sm" href="' + cfg.rxShow + '/' + v.id + '">View</a>' : '') + '</li>';
       }).join('') + '</ul>' : '<p class="muted" style="margin:4px 0 0">No visits name this tooth yet.</p>') +
         (cfg.rx ? '<a class="btn" style="margin-top:10px" href="' + cfg.rx + '&tooth=' + n + '">New visit for tooth ' + n + '</a>' : '');
       panel.innerHTML = h;
@@ -1011,4 +1067,22 @@
     });
     Object.keys(cfg.limits).forEach(render);
   });
+  // ---------- Month view: show who is booked when pointing at a date ----------
+  var mtip = null;
+  function hideTip() { if (mtip) { mtip.remove(); mtip = null; } }
+  function showTip(a) {
+    hideTip();
+    var src = $('.mtip', a); if (!src) return;
+    mtip = el('div', { class: 'mtip-float', role: 'tooltip' }, src.innerHTML); document.body.appendChild(mtip);
+    var r = a.getBoundingClientRect(), w = mtip.offsetWidth, h = mtip.offsetHeight;
+    var x = r.right + 8 + w > window.innerWidth - 8 ? r.left - w - 8 : r.right + 8;
+    var y = Math.min(Math.max(8, r.top), window.innerHeight - h - 8);
+    mtip.style.left = Math.max(8, x) + 'px'; mtip.style.top = y + 'px';
+  }
+  $$('[data-mtip]').forEach(function (a) {
+    a.addEventListener('mouseenter', function () { showTip(a); });
+    a.addEventListener('focus', function () { showTip(a); });
+    a.addEventListener('mouseleave', hideTip); a.addEventListener('blur', hideTip);
+  });
+  window.addEventListener('scroll', hideTip, { passive: true });
 })();

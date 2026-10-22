@@ -13,6 +13,12 @@ class Patient extends Model
         return ['medical_history' => 'array', 'active' => 'boolean'];
     }
 
+    /** Age today: worked out from the date of birth when there is one, so it never goes stale. */
+    protected function age(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::get(fn ($v, $a) => ! empty($a['dob']) ? \App\Support\Fmt::ageFrom($a['dob']) : ($v === null ? null : (int) $v));
+    }
+
     public function appointments()
     {
         return $this->hasMany(Appointment::class);

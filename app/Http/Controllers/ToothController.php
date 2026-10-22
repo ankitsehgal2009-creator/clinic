@@ -39,7 +39,8 @@ class ToothController extends Controller
             'patient' => $p,
             'marks' => $data,
             'history' => $history,
-            'child' => $p->age !== null && $p->age < 12,
+            // Age known: only the matching chart (milk teeth under 12). Age unknown: both charts.
+            'mode' => $p->age === null ? 'both' : ($p->age < 12 ? 'child' : 'adult'),
             'canEdit' => $me->isAdmin() || $me->role === 'DOCTOR',
             'rxUrl' => $me->canOpen('prescriptions') ? route('rx.create', ['patient' => $p->id]) : null,
         ];
