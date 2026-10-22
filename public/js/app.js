@@ -1000,6 +1000,48 @@
       img.src = url;
     });
   }
+  // Live camera window (laptops). take(file) gets each photo; fallback() opens the normal file picker.
+  function camera(left, take, fallback) {
+    var m = el('div', { class: 'modal cam', role: 'dialog', 'aria-label': 'Camera' }), stream = null, facing = 'environment', shots = 0;
+    m.innerHTML = '<div class="dlg cam-dlg"><div class="row" style="justify-content:space-between;margin-bottom:10px"><b>Camera</b><span class="muted" data-cam-n></span></div>' +
+      '<div class="cam-view"><video playsinline muted autoplay></video><div class="cam-flash"></div><p class="cam-msg muted">Starting the camera…</p></div>' +
+      '<div class="row cam-bar"><button type="button" class="btn" data-cam-x>Done</button><button type="button" class="btn hide" data-cam-flip>Switch camera</button>' +
+      '<button type="button" class="btn pri cam-shot" data-cam-shot disabled aria-label="Take photo"><span></span>Take photo</button></div></div>';
+    document.body.appendChild(m);
+    var video = $('video', m), msg = $('.cam-msg', m), shot = $('[data-cam-shot]', m), flip = $('[data-cam-flip]', m), count = $('[data-cam-n]', m);
+    function stop() { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+    function close() { stop(); m.remove(); document.removeEventListener('keydown', key); }
+    function key(e) { if (e.key === 'Escape') close(); if ((e.key === ' ' || e.key === 'Enter') && !shot.disabled && document.activeElement === document.body) { e.preventDefault(); snap(); } }
+    function showLeft() { var l = left(); count.textContent = shots ? shots + ' taken · ' + Math.max(0, l) + ' more allowed' : Math.max(0, l) + ' more allowed'; shot.disabled = !stream || l <= 0; }
+    function start() {
+      stop(); shot.disabled = true; msg.classList.remove('hide'); msg.textContent = 'Starting the camera…';
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
+        stream = s; video.srcObject = s; msg.classList.add('hide'); showLeft();
+        navigator.mediaDevices.enumerateDevices().then(function (d) { flip.classList.toggle('hide', d.filter(function (x) { return x.kind === 'videoinput'; }).length < 2); });
+      }).catch(function (er) {
+        var denied = er && (er.name === 'NotAllowedError' || er.name === 'SecurityError');
+        msg.innerHTML = (denied ? 'The browser blocked the camera. Click the camera icon in the address bar, choose Allow, then try again.' : 'No camera was found on this device.') +
+          '<br><button type="button" class="btn" style="margin-top:10px" data-cam-file>Choose a photo instead</button>';
+      });
+    }
+    function snap() {
+      if (!stream || left() <= 0) return;
+      var c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight; c.getContext('2d').drawImage(video, 0, 0);
+      var fl = $('.cam-flash', m); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+      c.toBlob(function (b) {
+        if (!b) return toast('Could not take the photo.', true);
+        shots++; take(new File([b], 'camera-' + Date.now() + '.jpg', { type: 'image/jpeg' })); setTimeout(showLeft, 50);
+      }, 'image/jpeg', 0.92);
+    }
+    m.addEventListener('click', function (e) {
+      if (e.target.closest('[data-cam-x]') || e.target === m) close();
+      else if (e.target.closest('[data-cam-shot]')) snap();
+      else if (e.target.closest('[data-cam-flip]')) { facing = facing === 'environment' ? 'user' : 'environment'; start(); }
+      else if (e.target.closest('[data-cam-file]')) { close(); fallback(); }
+    });
+    document.addEventListener('keydown', key);
+    start();
+  }
   function lightbox(list, i) {
     var m = el('div', { class: 'modal lbx', role: 'dialog', 'aria-label': 'Photo' });
     function draw() {
@@ -1054,15 +1096,33 @@
         });
       }).then(function (j) { t.remove(); files.push(j); render(kind); }, function (er) { t.remove(); render(kind); throw er; });
     }
+    function addFiles(kind, picked) {
+      var left = cfg.limits[kind] - of(kind).length - $$('[data-kind="' + kind + '"] .vp-tile.busy', box).length;
+      if (!picked.length) return;
+      if (left <= 0) return toast('This visit already has the most allowed.', true);
+      if (picked.length > left) { toast('Only ' + left + ' more can be added to this visit. The first ' + left + ' will be uploaded.', true); picked = picked.slice(0, left); }
+      var done = 0;
+      picked.reduce(function (p, f) { return p.then(function () { return upload(kind, f).then(function () { done++; }, function (er) { toast(er.message, true); }); }); }, Promise.resolve())
+        .then(function () { if (done) toast(done === 1 ? 'Photo added' : done + ' photos added'); });
+    }
     $$('[data-pick]', box).forEach(function (inp) {
       inp.addEventListener('change', function () {
-        var kind = inp.closest('[data-kind]').dataset.kind, picked = [].slice.call(inp.files), left = cfg.limits[kind] - of(kind).length;
+        var kind = inp.closest('[data-kind]').dataset.kind, picked = [].slice.call(inp.files);
         inp.value = '';
-        if (!picked.length) return;
-        if (picked.length > left) { toast('Only ' + left + ' more can be added to this visit. The first ' + left + ' will be uploaded.', true); picked = picked.slice(0, left); }
-        var done = 0, bad = 0;
-        picked.reduce(function (p, f) { return p.then(function () { return upload(kind, f).then(function () { done++; }, function (er) { bad++; toast(er.message, true); }); }); }, Promise.resolve())
-          .then(function () { if (done) toast(done === 1 ? 'Photo added' : done + ' photos added'); });
+        addFiles(kind, picked);
+      });
+    });
+    // Camera: phones and tablets open their own camera app; laptops get a live camera window here
+    var touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+    $$('[data-cam]', box).forEach(function (lbl) {
+      lbl.addEventListener('click', function (e) {
+        if (lbl.dataset.native) { delete lbl.dataset.native; return; } // "choose a photo instead"
+        if (touch || !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return; // native camera input
+        e.preventDefault();
+        var kind = lbl.closest('[data-kind]').dataset.kind;
+        camera(function () { return cfg.limits[kind] - of(kind).length - $$('[data-kind="' + kind + '"] .vp-tile.busy', box).length; },
+          function (file) { addFiles(kind, [file]); },
+          function () { lbl.dataset.native = '1'; $('input', lbl).click(); });
       });
     });
     Object.keys(cfg.limits).forEach(render);

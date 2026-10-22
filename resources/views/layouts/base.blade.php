@@ -8,12 +8,12 @@
 <title>@yield('title', 'SmileDesk')</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="{{ asset('css/app.css') }}?v=9">
+<link rel="stylesheet" href="{{ asset('css/app.css') }}?v=10">
 </head>
 <body class="@yield('bodyclass')">
 @yield('body')
 @stack('vendor')
-<script src="{{ asset('js/app.js') }}?v=9"></script>
+<script src="{{ asset('js/app.js') }}?v=10"></script>
 @stack('scripts')
 </body>
 </html>

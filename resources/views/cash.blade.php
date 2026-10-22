@@ -19,7 +19,8 @@
   <div class="card kpi"><span class="l">Total collected</span><span class="v">{{ Money::inr($collected) }}</span>@if ($byMode['BANK']['sum'] + $byMode['CHEQUE']['sum'])<span class="muted">Includes {{ Money::inr($byMode['BANK']['sum'] + $byMode['CHEQUE']['sum']) }} bank and cheque</span>@endif</div>
 </div>
 
-<div class="grid g2" style="margin-bottom:16px">
+<div class="cashwrap">
+<div class="cw-col">
   <div class="card">
     <h2>Cash in drawer</h2>
     @php($c = $closing)
@@ -42,6 +43,28 @@
     @endif
   </div>
 
+  <div class="card">
+    <h2>Paid out of the drawer</h2>
+    @forelse ($payouts as $p)
+      <div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)">
+        <div>{{ $p->description }}<br><small class="muted">{{ $p->user?->name }} · {{ $p->created_at->format('g:i A') }}</small></div>
+        <div class="row"><b class="mono">{{ Money::inr($p->amount) }}</b>
+          @if ($me->isAdmin() && ! $closing)<form method="post" action="{{ route('cash.payout.destroy', $p) }}" data-confirm="Delete this payout permanently?">@csrf @method('DELETE')<button class="btn sm danger">Delete</button></form>@endif</div>
+      </div>
+    @empty
+      <p class="muted">Nothing paid out{{ $isToday ? ' yet' : '' }}.</p>
+    @endforelse
+    @if ($isToday && ! $closing)
+      <form method="post" action="{{ route('cash.payout') }}" class="row noprint payout-f" style="margin-top:12px">
+        @csrf
+        <input name="description" class="inp" placeholder="What for, e.g. courier to lab" aria-label="Paid out for" required>
+        <input name="amount" class="inp mono" style="width:110px" inputmode="decimal" placeholder="₹" aria-label="Amount paid out" required>
+        <button class="btn">Add</button>
+      </form>
+    @endif
+  </div>
+</div>
+<div class="cw-col">
   @if ($closing)
     <div class="card">
       <h2>Notes counted</h2>
@@ -71,28 +94,7 @@
     </form>
   @endif
 </div>
-
-<div class="grid g2">
-  <div class="card">
-    <h2>Paid out of the drawer</h2>
-    @forelse ($payouts as $p)
-      <div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)">
-        <div>{{ $p->description }}<br><small class="muted">{{ $p->user?->name }} · {{ $p->created_at->format('g:i A') }}</small></div>
-        <div class="row"><b class="mono">{{ Money::inr($p->amount) }}</b>
-          @if ($me->isAdmin() && ! $closing)<form method="post" action="{{ route('cash.payout.destroy', $p) }}" data-confirm="Delete this payout permanently?">@csrf @method('DELETE')<button class="btn sm danger">Delete</button></form>@endif</div>
-      </div>
-    @empty
-      <p class="muted">Nothing paid out{{ $isToday ? ' yet' : '' }}.</p>
-    @endforelse
-    @if ($isToday && ! $closing)
-      <form method="post" action="{{ route('cash.payout') }}" class="row noprint" style="margin-top:12px;flex-wrap:nowrap">
-        @csrf
-        <input name="description" class="inp" placeholder="What for, e.g. courier to lab" aria-label="Paid out for" required>
-        <input name="amount" class="inp mono" style="width:110px" inputmode="decimal" placeholder="₹" aria-label="Amount paid out" required>
-        <button class="btn">Add</button>
-      </form>
-    @endif
-  </div>
+<div class="cw-col">
   <div class="card">
     <h2>Payments received</h2>
     @if ($payments->isNotEmpty())
@@ -105,22 +107,22 @@
       <p class="muted">No payments on this day.</p>
     @endif
   </div>
-</div>
-<div class="card" style="margin-top:16px" id="pending">
+
+<div class="card" id="pending">
   <div class="row" style="justify-content:space-between;margin-bottom:8px">
     <h2 style="margin:0">Pending payments</h2>
     <span class="chip {{ $pendingTotal ? 'c-bad' : 'c-ok' }}">{{ $pendingTotal ? Money::inr($pendingTotal).' due from '.$pending->pluck('patient_id')->unique()->count().' '.($pending->pluck('patient_id')->unique()->count() === 1 ? 'patient' : 'patients') : 'Nothing pending' }}</span>
   </div>
   @if ($pending->isNotEmpty())
-    <div class="tw"><table><thead><tr><th>Bill date</th><th>Patient</th><th>Bill</th><th style="text-align:right">Total</th><th style="text-align:right">Paid</th><th style="text-align:right">Due</th><th></th></tr></thead><tbody>
+    <div class="tw"><table><thead><tr><th>Bill date</th><th>Patient</th><th class="pc-x">Bill</th><th style="text-align:right" class="pc-x">Total</th><th style="text-align:right" class="pc-x">Paid</th><th style="text-align:right">Due</th><th></th></tr></thead><tbody>
       @foreach ($pending as $inv)
         @php($days = (int) floor((strtotime(Fmt::today()) - strtotime($inv->date)) / 86400))
         <tr>
           <td style="white-space:nowrap">{{ date('j M Y', strtotime($inv->date)) }}<br><small class="muted">{{ $days === 0 ? 'today' : ($days === 1 ? '1 day ago' : $days.' days ago') }}</small></td>
           <td>@if ($me->canOpen('patients'))<a href="{{ route('patients.show', $inv->patient_id) }}">{{ $inv->patient?->name }}</a>@else{{ $inv->patient?->name }}@endif<br><small class="muted mono">{{ $inv->patient?->code }} · {{ Fmt::showMobile($inv->patient?->mobile ?? '') }}</small></td>
-          <td class="mono">{{ $inv->number }}</td>
-          <td class="mono" style="text-align:right">{{ Money::inr($inv->total) }}</td>
-          <td class="mono" style="text-align:right">{{ Money::inr($inv->paid) }}</td>
+          <td class="mono pc-x">{{ $inv->number }}</td>
+          <td class="mono pc-x" style="text-align:right">{{ Money::inr($inv->total) }}</td>
+          <td class="mono pc-x" style="text-align:right">{{ Money::inr($inv->paid) }}</td>
           <td class="mono" style="text-align:right"><b class="{{ $days > 30 ? 'err' : '' }}">{{ Money::inr($inv->total - $inv->paid) }}</b></td>
           <td style="text-align:right">@if ($me->canOpen('billing'))<a class="btn sm" href="{{ route('billing.show', $inv) }}">Collect</a>@endif</td>
         </tr>
@@ -130,6 +132,8 @@
   @else
     <p class="muted">Every bill is fully paid.</p>
   @endif
+</div>
+</div>
 </div>
 {{-- One-page report used only for printing; the Print button scales it to fit the chosen paper --}}
 @php($cl = $me->clinic)
