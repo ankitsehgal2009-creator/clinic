@@ -18,7 +18,14 @@ class ApiController extends Controller
             return [];
         }
         return Patient::where('clinic_id', $this->me()->clinic_id)->where('active', true)
-            ->where('name', 'like', '%'.addcslashes($q, '%_').'%')
+            ->where(function ($w) use ($q) {
+                $like = '%'.addcslashes($q, '%_').'%';
+                $digits = preg_replace('/\D/', '', $q);
+                $w->where('name', 'like', $like)->orWhere('code', 'like', $like);
+                if (strlen($digits) >= 3 && strlen($digits) === strlen(preg_replace('/[\s+-]/', '', $q))) {
+                    $w->orWhere('mobile', 'like', "%$digits%");
+                }
+            })
             ->orderBy('name')->limit(8)
             ->get(['id', 'code', 'name', 'mobile', 'age', 'relation_type', 'relative_name']);
     }

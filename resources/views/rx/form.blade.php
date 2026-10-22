@@ -60,7 +60,8 @@
     <div class="field" style="margin-top:8px"><label for="adv">Advice printed below the medicines</label><textarea id="adv" name="advice" class="inp" rows="2" maxlength="2000" data-advice>{{ old('advice', $visit->advice ?? '') }}</textarea></div>
     <div class="field" style="margin-top:12px;max-width:320px"><label for="ds">Print design</label><select id="ds" name="design" class="inp">@foreach (Rx::DESIGNS as $k => [$n, $why])<option value="{{ $k }}" @selected(old('design', $visit->design ?? $me->clinic->rx_design) === $k)>{{ $n }}{{ $me->clinic->rx_design === $k ? ' (clinic default)' : '' }}</option>@endforeach</select></div>
   </div>
-  <div class="row"><button class="btn pri" data-save>{{ $visit ? 'Save changes' : 'Save and print' }}</button></div>
+  <div class="row"><button class="btn pri" data-save>{{ $visit ? 'Save changes' : 'Save and print' }}</button>@unless ($visit)<span class="hint">After saving you can add photos of a handwritten prescription and X-rays.</span>@endunless</div>
 </form>
+@if ($visit)@include('rx.photos')@endif
 @endsection
 @push('scripts')<script>window.NEW_PATIENT_URL = @json(route('patients.create'));</script>@endpush

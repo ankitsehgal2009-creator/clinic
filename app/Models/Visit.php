@@ -23,4 +23,9 @@ class Visit extends Model
     {
         return $this->hasMany(VisitMedicine::class)->orderBy('id');
     }
+
+    public function files()
+    {
+        return $this->hasMany(VisitFile::class)->orderBy('id');
+    }
 }

@@ -96,7 +96,17 @@
     function open(on) {
       pop.classList.toggle('hide', !on);
       btn.setAttribute('aria-expanded', on ? 'true' : 'false');
-      if (on) { draw(); loadCounts(); }
+      // Lift the open calendar above later cards (their entry animation gives each one its own layer)
+      for (var a = wrap.parentElement; a && a !== document.body; a = a.parentElement) {
+        if (on && !/^(static|relative)$/.test(getComputedStyle(a).position)) break;
+        a.classList.toggle('pk-up', on);
+      }
+      if (on) {
+        draw(); loadCounts();
+        pop.style.left = ''; pop.style.right = '';
+        var r = pop.getBoundingClientRect();
+        if (r.right > window.innerWidth - 8) { pop.style.left = 'auto'; pop.style.right = '0'; }
+      }
     }
     function set(k) {
       value = k;
@@ -820,6 +830,11 @@
       }
     });
   });
+  var dashPick = $('#dashpick');
+  if (dashPick) patientPicker(dashPick, function () {
+    var id = $('[data-pid]', dashPick).value;
+    if (id) location.href = dashPick.dataset.go + '/' + id;
+  });
   var teethPick = $('#teethpick');
   if (teethPick) patientPicker(teethPick, function () {
     var id = $('[data-pid]', teethPick).value;
@@ -914,4 +929,86 @@
     if (pub.dataset.oldDate) { timeIn.value = pub.dataset.oldTime; pickDay(pub.dataset.oldDate, true); }
     else { var first = $('[data-day]', pub); if (first) pickDay(first.dataset.day); }
   })();
+  // ---------- Visit photos: handwritten prescriptions (5) and X-rays (50), shrunk in the browser before upload ----------
+  function shrink(file, max, quality) {
+    return new Promise(function (ok, fail) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+        var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(function (b) { b ? ok(b) : fail(new Error('Could not read this photo.')); }, 'image/jpeg', quality);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); fail(new Error(file.name + ' is not a photo this browser can open. Please use JPG or PNG.')); };
+      img.src = url;
+    });
+  }
+  function lightbox(list, i) {
+    var m = el('div', { class: 'modal lbx', role: 'dialog', 'aria-label': 'Photo' });
+    function draw() {
+      var f = list[i];
+      m.innerHTML = '<div class="lbx-bar"><span>' + esc(f.name || '') + ' · ' + (i + 1) + ' of ' + list.length + '</span><span class="row"><a class="btn sm" href="' + f.download + '">Download</a><button type="button" class="btn sm" data-x>Close</button></span></div>' +
+        '<img src="' + f.url + '" alt="">' +
+        (list.length > 1 ? '<button type="button" class="lbx-nav prev" data-d="-1" aria-label="Previous">‹</button><button type="button" class="lbx-nav next" data-d="1" aria-label="Next">›</button>' : '');
+    }
+    function close() { m.remove(); document.removeEventListener('keydown', key); }
+    function key(e) { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { i = (i + (e.key === 'ArrowRight' ? 1 : -1) + list.length) % list.length; draw(); } }
+    m.addEventListener('click', function (e) {
+      var d = e.target.closest('[data-d]');
+      if (d) { i = (i + +d.dataset.d + list.length) % list.length; draw(); return; }
+      if (e.target.closest('[data-x]') || e.target === m) close();
+    });
+    document.addEventListener('keydown', key);
+    draw(); document.body.appendChild(m);
+  }
+  $$('[data-vphotos]').forEach(function (box) {
+    var cfg = JSON.parse(box.dataset.vphotos), files = cfg.files;
+    function of(kind) { return files.filter(function (f) { return f.kind === kind; }); }
+    function render(kind) {
+      var sec = $('[data-kind="' + kind + '"]', box), grid = $('[data-grid]', sec), list = of(kind), left = cfg.limits[kind] - list.length;
+      $('[data-count]', sec).textContent = list.length + ' of ' + cfg.limits[kind];
+      $('[data-add]', sec).classList.toggle('hide', left <= 0);
+      $$('.vp-tile:not(.busy)', grid).forEach(function (t) { t.remove(); });
+      list.forEach(function (f, i) {
+        var t = el('div', { class: 'vp-tile' }, '<button type="button" class="vp-img" aria-label="Open ' + esc(f.name || 'photo') + '"><img src="' + f.thumb + '" alt="" loading="lazy"></button>' +
+          (f.del ? '<button type="button" class="vp-del" aria-label="Delete photo" title="Delete permanently">✕</button>' : ''));
+        $('.vp-img', t).addEventListener('click', function () { lightbox(list, i); });
+        if (f.del) $('.vp-del', t).addEventListener('click', function () {
+          if (!confirm('Delete this photo permanently?')) return;
+          send('DELETE', f.del).then(function () { files = files.filter(function (x) { return x.id !== f.id; }); render(kind); toast('Photo deleted'); }).catch(function (e) { toast(e.message, true); });
+        });
+        grid.insertBefore(t, $('.vp-tile.busy', grid));
+      });
+      if (!list.length && !$('.vp-tile.busy', grid)) grid.innerHTML = '<p class="muted vp-empty">None yet.</p>'; else { var e = $('.vp-empty', grid); if (e) e.remove(); }
+    }
+    function upload(kind, file) {
+      var grid = $('[data-kind="' + kind + '"] [data-grid]', box), e = $('.vp-empty', grid); if (e) e.remove();
+      var t = el('div', { class: 'vp-tile busy' }, '<span class="vp-prog"><i></i></span>'); grid.appendChild(t);
+      var bar = $('i', t);
+      return Promise.all([shrink(file, 2400, 0.86), shrink(file, 360, 0.75)]).then(function (b) {
+        var fd = new FormData(); fd.append('kind', kind); fd.append('name', file.name.replace(/\.[^.]+$/, '') + '.jpg');
+        fd.append('file', b[0], 'photo.jpg'); fd.append('thumb', b[1], 'thumb.jpg');
+        return new Promise(function (ok, fail) {
+          var x = new XMLHttpRequest(); x.open('POST', cfg.upload); x.setRequestHeader('X-CSRF-TOKEN', CSRF); x.setRequestHeader('Accept', 'application/json');
+          x.upload.onprogress = function (ev) { if (ev.lengthComputable) bar.style.width = Math.round(ev.loaded / ev.total * 100) + '%'; };
+          x.onload = function () { var j = {}; try { j = JSON.parse(x.responseText); } catch (er) {} x.status < 300 ? ok(j) : fail(new Error(x.status === 419 ? 'Your session expired. Reload the page.' : (j.message || 'Upload failed.'))); };
+          x.onerror = function () { fail(new Error('Upload failed. Check your internet.')); };
+          x.send(fd);
+        });
+      }).then(function (j) { t.remove(); files.push(j); render(kind); }, function (er) { t.remove(); render(kind); throw er; });
+    }
+    $$('[data-pick]', box).forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var kind = inp.closest('[data-kind]').dataset.kind, picked = [].slice.call(inp.files), left = cfg.limits[kind] - of(kind).length;
+        inp.value = '';
+        if (!picked.length) return;
+        if (picked.length > left) { toast('Only ' + left + ' more can be added to this visit. The first ' + left + ' will be uploaded.', true); picked = picked.slice(0, left); }
+        var done = 0, bad = 0;
+        picked.reduce(function (p, f) { return p.then(function () { return upload(kind, f).then(function () { done++; }, function (er) { bad++; toast(er.message, true); }); }); }, Promise.resolve())
+          .then(function () { if (done) toast(done === 1 ? 'Photo added' : done + ' photos added'); });
+      });
+    });
+    Object.keys(cfg.limits).forEach(render);
+  });
 })();

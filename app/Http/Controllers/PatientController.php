@@ -54,18 +54,7 @@ class PatientController extends Controller
     public function store(Request $r)
     {
         $me = $this->me();
-        $v = $r->validate([
-            'name' => 'required|string|min:2|max:150',
-            'mobile' => ['required', self::mobileRule()],
-            'gender' => 'nullable|in:Male,Female,Other',
-            'dob' => 'nullable|date_format:Y-m-d|before_or_equal:today',
-            'age' => 'nullable|integer|min:0|max:120',
-            'relation_type' => 'nullable|in:FATHER,HUSBAND,WIFE,MOTHER',
-            'relative_name' => 'nullable|string|max:150',
-            'address' => 'nullable|string|max:250',
-            'history' => 'nullable|array',
-            'history.*' => 'string|max:100',
-        ], ['name.min' => "Enter the patient's full name."]);
+        $v = $this->validated($r);
 
         $patient = DB::transaction(fn () => Patient::create([
             'clinic_id' => $me->clinic_id,
@@ -86,6 +75,57 @@ class PatientController extends Controller
             : redirect()->route('patients.show', $patient);
     }
 
+    private function validated(Request $r): array
+    {
+        return $r->validate([
+            'name' => 'required|string|min:2|max:150',
+            'mobile' => ['required', self::mobileRule()],
+            'gender' => 'nullable|in:Male,Female,Other',
+            'dob' => 'nullable|date_format:Y-m-d|before_or_equal:today',
+            'age' => 'nullable|integer|min:0|max:120',
+            'relation_type' => 'nullable|in:FATHER,HUSBAND,WIFE,MOTHER',
+            'relative_name' => 'nullable|string|max:150',
+            'address' => 'nullable|string|max:250',
+            'history' => 'nullable|array',
+            'history.*' => 'string|max:100',
+        ], ['name.min' => "Enter the patient's full name."]);
+    }
+
+    public function edit(Patient $patient)
+    {
+        $this->own($patient);
+        abort_unless($this->me()->canEditPatients(), 403, 'Only the admin and doctors can change patient details.');
+        return view('patients.create', ['p' => $patient, 'nextCode' => $patient->code]);
+    }
+
+    public function update(Request $r, Patient $patient)
+    {
+        $this->own($patient);
+        $me = $this->me();
+        abort_unless($me->canEditPatients(), 403, 'Only the admin and doctors can change patient details.');
+        $v = $this->validated($r);
+        $patient->fill([
+            'name' => $v['name'],
+            'mobile' => Fmt::mobile($v['mobile']),
+            'gender' => $v['gender'] ?? null,
+            'dob' => $v['dob'] ?? null,
+            'age' => ! empty($v['dob']) ? Fmt::ageFrom($v['dob']) : ($v['age'] ?? null),
+            'relation_type' => $v['relation_type'] ?? null,
+            'relative_name' => $v['relative_name'] ?? null,
+            'address' => $v['address'] ?? null,
+            'medical_history' => array_values(array_unique($v['history'] ?? [])),
+        ]);
+        $labels = ['name' => 'name', 'mobile' => 'mobile', 'gender' => 'gender', 'dob' => 'date of birth', 'age' => 'age', 'relation_type' => 'relation', 'relative_name' => "relative's name", 'address' => 'address', 'medical_history' => 'medical history'];
+        $changed = array_values(array_intersect_key($labels, $patient->getDirty()));
+        if ($changed) {
+            $old = $patient->getOriginal('name');
+            $patient->save();
+            Activity::log($me, 'Edited patient', "$patient->code · ".($old !== $patient->name ? "$old → $patient->name" : $patient->name).' · changed '.implode(', ', $changed));
+            return redirect()->route('patients.show', $patient)->with('ok', 'Patient details saved.');
+        }
+        return redirect()->route('patients.show', $patient)->with('ok', 'Nothing was changed.');
+    }
+
     /** Next patient ID for a clinic, e.g. SC-0153. Call inside a transaction: the clinic row is locked. */
     public static function nextCode(int $clinicId): string
     {
@@ -103,7 +143,7 @@ class PatientController extends Controller
             'appts' => $patient->appointments()->with('chair', 'doctor')->orderByDesc('date')->orderByDesc('start_min')->limit(50)->get(),
             'bills' => $this->me()->canOpen('billing') ? $patient->invoices()->orderByDesc('date')->orderByDesc('id')->limit(50)->get() : null,
             'balance' => $patient->balance(),
-            'visits' => $this->me()->canOpen('prescriptions') ? \App\Models\Visit::with('doctor:id,name')->where('patient_id', $patient->id)->orderByDesc('date')->orderByDesc('id')->limit(50)->get() : null,
+            'visits' => $this->me()->canOpen('prescriptions') ? \App\Models\Visit::with('doctor:id,name')->withCount(['files as rx_photos' => fn ($q) => $q->where('kind', 'RX'), 'files as xrays' => fn ($q) => $q->where('kind', 'XRAY')])->where('patient_id', $patient->id)->orderByDesc('date')->orderByDesc('id')->limit(50)->get() : null,
             'chart' => $this->me()->canOpen('teeth') ? ToothController::chartData($patient, $this->me()) : null,
             'family' => Patient::where('clinic_id', $patient->clinic_id)->where('mobile', $patient->mobile)->whereKeyNot($patient->id)->get(['id', 'name', 'code']),
         ]);
@@ -124,6 +164,7 @@ class PatientController extends Controller
         DB::transaction(function () use ($patient) {
             $patient->appointments()->delete();
             $patient->invoices()->delete(); // payments go with their bills
+            \App\Models\VisitFile::where('patient_id', $patient->id)->get()->each->purge();
             \App\Models\Visit::where('patient_id', $patient->id)->delete(); // medicines go with their visits
             \App\Models\ToothMark::where('patient_id', $patient->id)->delete();
             $patient->delete();

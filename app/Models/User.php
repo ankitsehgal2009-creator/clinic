@@ -50,6 +50,12 @@ class User extends Authenticatable
     }
 
     /** Admin and the owner doctor may change clinic settings and the logo. */
+    /** Admin and doctors can change a patient's details after they are added. */
+    public function canEditPatients(): bool
+    {
+        return $this->isAdmin() || $this->role === 'DOCTOR';
+    }
+
     public function canManageClinic(): bool
     {
         return $this->isAdmin() || ($this->role === 'DOCTOR' && $this->is_owner);

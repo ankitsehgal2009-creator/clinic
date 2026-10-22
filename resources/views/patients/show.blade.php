@@ -28,6 +28,7 @@
       @if (auth()->user()->canOpen('appointments') && $p->active)<a class="btn pri" href="{{ route('appointments.create', ['patient' => $p->id]) }}">Book appointment</a>@endif
       @if ($visits !== null && $p->active)<a class="btn pri" href="{{ route('rx.create', ['patient' => $p->id]) }}">New visit & Rx</a>@endif
       @if (auth()->user()->canOpen('billing'))<a class="btn" href="{{ route('billing.create', ['patient' => $p->id]) }}">New bill</a>@endif
+      @if (auth()->user()->canEditPatients())<a class="btn" href="{{ route('patients.edit', $p) }}">Edit details</a>@endif
       @if (auth()->user()->isAdmin())
         <form method="post" action="{{ route('patients.destroy', $p) }}" data-confirm="Delete {{ $p->name }} with all their appointments and bills? This cannot be undone.">@csrf @method('DELETE')<button class="btn danger">Delete permanently</button></form>
       @endif
@@ -42,7 +43,7 @@
     @if ($visits->isNotEmpty())
       <div class="tw"><table><thead><tr><th>Date</th><th>Visit</th><th></th></tr></thead><tbody>
         @foreach ($visits as $v)
-          <tr><td style="white-space:nowrap">{{ Fmt::date($v->date) }}</td><td>{{ $v->procedure ?: $v->complaint ?: 'Visit' }}<br><small class="muted">{{ $v->teeth ? 'Tooth '.$v->teeth.' · ' : '' }}{{ $v->doctor?->name }}</small></td><td style="text-align:right"><a class="btn sm" href="{{ route('rx.show', $v) }}">Rx</a></td></tr>
+          <tr><td style="white-space:nowrap">{{ Fmt::date($v->date) }}</td><td>{{ $v->procedure ?: $v->complaint ?: 'Visit' }}<br><small class="muted">{{ $v->teeth ? 'Tooth '.$v->teeth.' · ' : '' }}{{ $v->doctor?->name }}</small>@if ($v->rx_photos || $v->xrays)<br><span class="photo-chip">{{ implode(' · ', array_filter([$v->rx_photos ? $v->rx_photos.' Rx '.($v->rx_photos === 1 ? 'photo' : 'photos') : null, $v->xrays ? $v->xrays.' '.($v->xrays === 1 ? 'X-ray' : 'X-rays') : null])) }}</span>@endif</td><td style="text-align:right"><a class="btn sm" href="{{ route('rx.show', $v) }}">Rx</a></td></tr>
         @endforeach
       </tbody></table></div>
     @else

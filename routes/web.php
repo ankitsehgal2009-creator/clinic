@@ -15,6 +15,7 @@ use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\ToothController;
+use App\Http\Controllers\VisitFileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect(auth()->check() ? auth()->user()->homeUrl() : '/login'));
@@ -63,6 +64,9 @@ Route::middleware(['auth', 'page'])->group(function () {
         Route::get('/patients/new', [PatientController::class, 'create'])->name('patients.create');
         Route::post('/patients', [PatientController::class, 'store'])->name('patients.store');
         Route::get('/patients/{patient}', [PatientController::class, 'show'])->name('patients.show');
+        Route::get('/api/dash/patients', [ApiController::class, 'search']);
+        Route::get('/patients/{patient}/edit', [PatientController::class, 'edit'])->name('patients.edit');
+        Route::post('/patients/{patient}/edit', [PatientController::class, 'update'])->name('patients.update');
         Route::post('/patients/{patient}/active', [PatientController::class, 'active'])->name('patients.active');
         Route::delete('/patients/{patient}', [PatientController::class, 'destroy'])->name('patients.destroy');
     });
@@ -96,6 +100,9 @@ Route::middleware(['auth', 'page'])->group(function () {
         Route::get('/prescriptions/{visit}', [PrescriptionController::class, 'show'])->whereNumber('visit')->name('rx.show');
         Route::get('/prescriptions/{visit}/edit', [PrescriptionController::class, 'edit'])->name('rx.edit');
         Route::post('/prescriptions/{visit}', [PrescriptionController::class, 'update'])->name('rx.update');
+        Route::post('/prescriptions/{visit}/files', [VisitFileController::class, 'store'])->name('visitfiles.store');
+        Route::get('/visit-files/{file}', [VisitFileController::class, 'show'])->name('visitfiles.show');
+        Route::delete('/visit-files/{file}', [VisitFileController::class, 'destroy'])->name('visitfiles.destroy');
         Route::get('/api/rx/patients', [ApiController::class, 'search']);
     });
 

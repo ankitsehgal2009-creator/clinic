@@ -34,4 +34,5 @@
     @if ($visit->next_visit && auth()->user()->canOpen('appointments'))<a class="btn" href="{{ route('appointments.create', ['patient' => $visit->patient_id, 'date' => $visit->next_visit]) }}">Book the next visit</a>@endif
   </div>
 </div>
+@include('rx.photos')
 @endsection
