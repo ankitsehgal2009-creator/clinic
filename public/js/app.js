@@ -1046,7 +1046,7 @@
     var m = el('div', { class: 'modal lbx', role: 'dialog', 'aria-label': 'Photo' });
     function draw() {
       var f = list[i];
-      m.innerHTML = '<div class="lbx-bar"><span>' + esc(f.name || '') + ' · ' + (i + 1) + ' of ' + list.length + '</span><span class="row"><a class="btn sm" href="' + f.download + '">Download</a><button type="button" class="btn sm" data-x>Close</button></span></div>' +
+      m.innerHTML = '<div class="lbx-bar"><span>' + esc(f.name || '') + ' · ' + (i + 1) + ' of ' + list.length + (f.at ? '<br><small class="lbx-at">Uploaded ' + esc(f.at) + (f.by ? ' by ' + esc(f.by) : '') + '</small>' : '') + '</span><span class="row"><a class="btn sm" href="' + f.download + '">Download</a><button type="button" class="btn sm" data-x>Close</button></span></div>' +
         '<img src="' + f.url + '" alt="">' +
         (list.length > 1 ? '<button type="button" class="lbx-nav prev" data-d="-1" aria-label="Previous">‹</button><button type="button" class="lbx-nav next" data-d="1" aria-label="Next">›</button>' : '');
     }
@@ -1060,6 +1060,11 @@
     document.addEventListener('keydown', key);
     draw(); document.body.appendChild(m);
   }
+  // Patient file: all of a patient's photos and X-rays, each kind one viewer list.
+  $$('[data-pgallery]').forEach(function (sec) {
+    var list = JSON.parse(sec.dataset.pgallery);
+    sec.addEventListener('click', function (e) { var b = e.target.closest('.vp-img[data-i]'); if (b) lightbox(list, +b.dataset.i); });
+  });
   $$('[data-vphotos]').forEach(function (box) {
     var cfg = JSON.parse(box.dataset.vphotos), files = cfg.files;
     function of(kind) { return files.filter(function (f) { return f.kind === kind; }); }
@@ -1070,6 +1075,7 @@
       $$('.vp-tile:not(.busy)', grid).forEach(function (t) { t.remove(); });
       list.forEach(function (f, i) {
         var t = el('div', { class: 'vp-tile' }, '<button type="button" class="vp-img" aria-label="Open ' + esc(f.name || 'photo') + '"><img src="' + f.thumb + '" alt="" loading="lazy"></button>' +
+          (f.at ? '<span class="vp-at" title="Uploaded ' + esc(f.at) + (f.by ? ' by ' + esc(f.by) : '') + '">' + esc(f.at) + '</span>' : '') +
           (f.del ? '<button type="button" class="vp-del" aria-label="Delete photo" title="Delete permanently">✕</button>' : ''));
         $('.vp-img', t).addEventListener('click', function () { lightbox(list, i); });
         if (f.del) $('.vp-del', t).addEventListener('click', function () {

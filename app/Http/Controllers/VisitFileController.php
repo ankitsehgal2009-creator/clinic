@@ -81,7 +81,8 @@ class VisitFileController extends Controller
             'url' => route('visitfiles.show', $f), 'thumb' => route('visitfiles.show', [$f, 'thumb' => 1]),
             'download' => route('visitfiles.show', [$f, 'download' => 1]),
             'del' => $me->isAdmin() ? route('visitfiles.destroy', $f) : null,
-            'at' => $f->created_at?->format('j M Y, g:i a'),
+            'at' => $f->created_at?->timezone('Asia/Kolkata')->format('j M Y, g:i A'),
+            'by' => $f->uploader?->name,
         ];
     }
 }

@@ -35,6 +35,15 @@
     </div>
   </div>
 </div>
+@if ($photos->isNotEmpty())
+  @php($nRx = $photos->where('kind', 'RX')->count())
+  @php($nX = $photos->where('kind', 'XRAY')->count())
+  <nav class="jumpbar" aria-label="Jump to">
+    <span class="muted">Files:</span>
+    @if ($nRx)<a class="btn sm" href="#photos-RX">Prescription photos <b>{{ $nRx }}</b></a>@endif
+    @if ($nX)<a class="btn sm" href="#photos-XRAY">X-rays <b>{{ $nX }}</b></a>@endif
+  </nav>
+@endif
 @if ($chart)<div style="margin-bottom:16px">@include('teeth.chart', ['chart' => $chart])</div>@endif
 <div class="grid g2">
   @if ($visits !== null)
@@ -90,4 +99,28 @@
     @endforelse
   </div>
 </div>
+@if ($photos->isNotEmpty())
+<div class="card pgallery" id="photos" style="margin-top:16px">
+  @foreach (\App\Models\VisitFile::KINDS as $k => $label)
+    @php($list = $photos->where('kind', $k)->values())
+    @continue($list->isEmpty())
+    <section id="photos-{{ $k }}" class="pg-sec" data-pgallery="{{ json_encode($list->map(fn ($f) => \App\Http\Controllers\VisitFileController::json($f, auth()->user()))->values()) }}">
+      <h2>{{ $label }} <small class="muted">{{ $list->count() }}</small></h2>
+      @php($i = 0)
+      @foreach ($list->groupBy('visit_id') as $vid => $group)
+        <div class="pg-visit">
+          <div class="row" style="justify-content:space-between"><b>Visit {{ Fmt::date($group->first()->visit_date) }}</b><a class="btn sm" href="{{ route('rx.show', $vid) }}">Open visit</a></div>
+          <small class="muted">{{ $group->first()->visit_what ?: $group->first()->visit_cc }}</small>
+          <div class="vp-grid" style="margin-top:8px">
+            @foreach ($group as $f)
+              <figure class="vp-fig"><div class="vp-tile"><button type="button" class="vp-img" data-i="{{ $i++ }}" aria-label="Open {{ $label }} {{ $loop->iteration }}"><img src="{{ route('visitfiles.show', [$f, 'thumb' => 1]) }}" alt="" loading="lazy"></button></div>
+                <figcaption>{{ $f->created_at->format('j M Y, g:i A') }}@if ($f->uploader)<br>{{ $f->uploader->name }}@endif</figcaption></figure>
+            @endforeach
+          </div>
+        </div>
+      @endforeach
+    </section>
+  @endforeach
+</div>
+@endif
 @endsection

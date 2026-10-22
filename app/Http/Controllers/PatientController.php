@@ -144,6 +144,9 @@ class PatientController extends Controller
             'bills' => $this->me()->canOpen('billing') ? $patient->invoices()->orderByDesc('date')->orderByDesc('id')->limit(50)->get() : null,
             'balance' => $patient->balance(),
             'visits' => $this->me()->canOpen('prescriptions') ? \App\Models\Visit::with('doctor:id,name')->withCount(['files as rx_photos' => fn ($q) => $q->where('kind', 'RX'), 'files as xrays' => fn ($q) => $q->where('kind', 'XRAY')])->where('patient_id', $patient->id)->orderByDesc('date')->orderByDesc('id')->limit(50)->get() : null,
+            'photos' => $this->me()->canOpen('prescriptions') ? \App\Models\VisitFile::with('uploader:id,name')->join('visits', 'visits.id', '=', 'visit_files.visit_id')
+                ->where('visit_files.patient_id', $patient->id)->where('visit_files.clinic_id', $patient->clinic_id)
+                ->orderByDesc('visits.date')->orderByDesc('visit_files.id')->get(['visit_files.*', 'visits.date as visit_date', 'visits.procedure as visit_what', 'visits.complaint as visit_cc']) : collect(),
             'chart' => $this->me()->canOpen('teeth') ? ToothController::chartData($patient, $this->me()) : null,
             'family' => Patient::where('clinic_id', $patient->clinic_id)->where('mobile', $patient->mobile)->whereKeyNot($patient->id)->get(['id', 'name', 'code']),
         ]);

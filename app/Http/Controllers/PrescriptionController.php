@@ -42,7 +42,7 @@ class PrescriptionController extends Controller
     public function edit(Visit $visit)
     {
         $this->own($visit);
-        $visit->load('patient', 'medicines', 'files');
+        $visit->load('patient', 'medicines', 'files.uploader:id,name');
         return view('rx.form', $this->formData($this->me(), $visit->patient) + ['visit' => $visit, 'patient' => $visit->patient, 'tooth' => null]);
     }
 
@@ -173,7 +173,7 @@ class PrescriptionController extends Controller
     public function show(Request $r, Visit $visit)
     {
         $this->own($visit);
-        $visit->load('patient', 'doctor', 'medicines', 'files');
+        $visit->load('patient', 'doctor', 'medicines', 'files.uploader:id,name');
         $design = array_key_exists($r->query('design'), Rx::DESIGNS) ? $r->query('design') : $visit->design;
         return view('rx.show', ['visit' => $visit, 'design' => $design, 'c' => $this->me()->clinic]);
     }
