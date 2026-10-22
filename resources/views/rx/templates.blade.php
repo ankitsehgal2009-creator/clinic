@@ -43,7 +43,7 @@
       <td style="width:95px"><input class="inp" data-f="days" placeholder="5 days" aria-label="Days"></td>
       <td><button type="button" class="btn sm" data-del aria-label="Remove medicine">✕</button></td>
     </tr></template>
-    <div class="row" style="margin-top:12px"><button type="button" class="btn" data-add>+ Add medicine</button><a class="btn" href="{{ route('rx.medicines') }}">Medicine library</a></div>
+    <div class="row" style="margin-top:12px"><button type="button" class="btn" data-add>+ Add medicine</button><a class="btn" href="{{ route('rx.medicines') }}">Medicine library</a><label class="chk online-chk" title="Also look up medicine names that are not in your library"><input type="checkbox" data-online-meds> Search medicine names online too</label></div>
     <div class="field" style="margin-top:12px"><label for="ta">Advice printed below</label><textarea id="ta" name="advice" class="inp" rows="3" maxlength="2000">{{ old('advice', $edit?->advice) }}</textarea></div>
     <p class="hint">Dose is morning-afternoon-night, so 1-0-1 means one in the morning and one at night. Turn a template off to hide it from new visits.</p>
     <div class="row" style="margin-top:6px"><button class="btn pri">Save template</button></div>

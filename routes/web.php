@@ -92,6 +92,7 @@ Route::middleware(['auth', 'page'])->group(function () {
         Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('rx.index');
         Route::get('/prescriptions/new', [PrescriptionController::class, 'create'])->name('rx.create');
         Route::post('/prescriptions', [PrescriptionController::class, 'store'])->name('rx.store');
+        Route::get('/api/rx/medicines/online', [PrescriptionController::class, 'onlineMedicines'])->middleware('throttle:60,1');
         Route::get('/prescriptions/medicines', [PrescriptionController::class, 'medicines'])->name('rx.medicines');
         Route::post('/prescriptions/medicines', [PrescriptionController::class, 'addMedicine'])->name('rx.medicines.store');
         Route::post('/prescriptions/medicines/{medicine}', [PrescriptionController::class, 'updateMedicine'])->name('rx.medicines.update');

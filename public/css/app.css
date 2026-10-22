@@ -682,3 +682,17 @@ html.leaving .content{opacity:.6;transition:opacity .3s .15s}
 .medadd{grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr))}
 @media (max-width:900px){.medadd{grid-template-columns:1fr 1fr}.medadd .field:first-child{grid-column:1/-1}}
 table.medlib tr[hidden]{display:none!important}
+.sugg2{position:fixed;z-index:120;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);overflow-y:auto;-webkit-overflow-scrolling:touch;animation:fade .12s}
+.sugg2 .sg{padding:9px 12px;font-size:14px}.sugg2 .sg b{font-weight:500}
+@media (max-width:600px){
+  table.meds tbody td:nth-child(2),table.meds tbody td:nth-child(4){grid-column:1}
+  table.meds tbody td:nth-child(3),table.meds tbody td:nth-child(5){grid-column:2/4}
+  table.medlib tbody tr{grid-template-columns:1fr 1fr auto}
+  table.medlib tbody td:nth-child(6){grid-column:1;align-self:center}
+  table.medlib tbody td:nth-child(7){grid-column:2;align-self:center}
+  table.medlib tbody td:nth-child(8){grid-column:3;grid-row:auto}
+  table.medlib tbody td:first-child{grid-column:1/-1}
+}
+.online-chk{font-size:13px;color:var(--muted);align-self:center}
+.sugg2 .sg-head{padding:6px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--surface-2);border-top:1px solid var(--line)}
+.sugg2 .sg-head:first-child{border-top:0}

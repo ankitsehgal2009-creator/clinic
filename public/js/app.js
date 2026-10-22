@@ -68,6 +68,90 @@
     return track(fetch(url, { headers: { Accept: 'application/json' } }).then(function (r) { if (!r.ok) throw new Error('Could not load. Check your connection.'); return r.json(); }));
   }
 
+  // ---------- Suggestions under a box (replaces <datalist>, which phones such as iPhone barely show) ----------
+  var sgBox = null, sgFor = null, sgHits = [], sgIdx = -1;
+  function sgClose() { if (sgBox) sgBox.remove(); sgBox = null; sgFor = null; }
+  function sgPlace() {
+    if (!sgBox || !sgFor) return;
+    var r = sgFor.getBoundingClientRect(), below = innerHeight - r.bottom;
+    sgBox.style.left = r.left + 'px'; sgBox.style.width = Math.max(r.width, 220) + 'px';
+    if (below < 200 && r.top > below) { sgBox.style.top = ''; sgBox.style.bottom = (innerHeight - r.top + 4) + 'px'; sgBox.style.maxHeight = Math.min(300, r.top - 12) + 'px'; }
+    else { sgBox.style.bottom = ''; sgBox.style.top = (r.bottom + 4) + 'px'; sgBox.style.maxHeight = Math.min(300, below - 12) + 'px'; }
+  }
+  var sgTimer, sgAsk = 0;
+  function onlineOn(inp) { var f = inp.closest('form'), c = f && $('[data-online-meds]', f); return c && c.checked; }
+  function sgShow(inp, online) {
+    var dl = document.getElementById(inp.dataset.sugg); if (!dl) return;
+    var q = inp.value.trim().toLowerCase(), opts = $$('option', dl);
+    var starts = [], has = [];
+    opts.forEach(function (o) { var v = o.value.toLowerCase(); if (!q || v.indexOf(q) === 0) starts.push(o); else if (v.indexOf(q) > 0) has.push(o); });
+    var local = starts.concat(has).filter(function (o) { return o.value.toLowerCase() !== q; }).slice(0, 12);
+    var known = {}; opts.forEach(function (o) { known[o.value.toLowerCase()] = 1; });
+    var web = (online || []).filter(function (o) { return !known[o.value.toLowerCase()]; });
+    var asking = inp.dataset.sugg === 'rx-meds' && q.length >= 3 && onlineOn(inp);
+    sgHits = local.concat(web);
+    if (!sgHits.length && !(asking && !online)) { sgClose(); }
+    else {
+      if (!sgBox) { sgBox = el('div', { class: 'sugg2', role: 'listbox' }); document.body.appendChild(sgBox); }
+      sgFor = inp; sgIdx = -1;
+      var row = function (o, i) {
+        var d = o.dataset, sub = [d.form, d.dose, d.timing, d.days].filter(Boolean).join(' · ');
+        return '<div class="sg" role="option" data-i="' + i + '"><div><b>' + esc(o.value) + '</b>' + (sub ? '<br><small class="muted">' + esc(sub) + '</small>' : '') + '</div></div>';
+      };
+      sgBox.innerHTML = local.map(row).join('') +
+        (asking ? '<div class="sg-head">' + (online ? (web.length ? 'Online · generic names' : 'Nothing more found online') : 'Searching online…') + '</div>' : '') +
+        web.map(function (o, i) { return row(o, local.length + i); }).join('');
+      sgPlace();
+    }
+    if (asking && !online) {
+      clearTimeout(sgTimer);
+      var ask = ++sgAsk;
+      sgTimer = setTimeout(function () {
+        fetch('/api/rx/medicines/online?q=' + encodeURIComponent(inp.value.trim()), { headers: { Accept: 'application/json' } })
+          .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Online search is not answering right now.'); return j; }); })
+          .then(function (list) {
+            if (ask !== sgAsk || document.activeElement !== inp) return;
+            sgShow(inp, list.map(function (m) { return { value: m.name, dataset: { form: m.form || '' }, online: true }; }));
+          })
+          .catch(function (e) { if (ask === sgAsk && sgBox && sgFor === inp) { var h = $('.sg-head', sgBox); if (h) h.textContent = e.message || 'Online search is not answering right now.'; } });
+      }, 350);
+    }
+  }
+  function sgPick(i) {
+    var inp = sgFor, o = sgHits[i]; if (!inp || !o) return;
+    if (o.online) { var dl = document.getElementById(inp.dataset.sugg); if (dl) dl.appendChild(el('option', { value: o.value, 'data-form': o.dataset.form })); }
+    inp.value = o.value; sgClose();
+    inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  function sgUpgrade(root) {
+    var list = root.matches && root.matches('input[list]') ? [root] : $$('input[list]', root);
+    list.forEach(function (inp) { inp.dataset.sugg = inp.getAttribute('list'); inp.removeAttribute('list'); inp.setAttribute('autocomplete', 'off'); });
+  }
+  sgUpgrade(document);
+  $$('[data-online-meds]').forEach(function (c) {
+    try { c.checked = localStorage.getItem('sd-online-meds') === '1'; } catch (e) {}
+    c.addEventListener('change', function () { try { localStorage.setItem('sd-online-meds', c.checked ? '1' : '0'); } catch (e) {} });
+  });
+  new MutationObserver(function (ms) { ms.forEach(function (m) { m.addedNodes.forEach(function (n) { if (n.nodeType === 1) sgUpgrade(n); }); }); }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('focusin', function (e) { if (e.target.dataset && e.target.dataset.sugg) sgShow(e.target); else if (sgBox && !sgBox.contains(e.target)) sgClose(); });
+  document.addEventListener('input', function (e) { if (e.target.dataset && e.target.dataset.sugg && e.isTrusted) sgShow(e.target); });
+  document.addEventListener('focusout', function (e) { if (e.target === sgFor) setTimeout(function () { if (document.activeElement !== sgFor) sgClose(); }, 120); });
+  document.addEventListener('keydown', function (e) {
+    if (!sgBox || e.target !== sgFor) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); sgIdx = (sgIdx + (e.key === 'ArrowDown' ? 1 : -1) + sgHits.length) % sgHits.length;
+      $$('.sg', sgBox).forEach(function (x, i) { x.classList.toggle('on', i === sgIdx); if (i === sgIdx) x.scrollIntoView({ block: 'nearest' }); });
+    } else if (e.key === 'Enter' && sgIdx >= 0) { e.preventDefault(); sgPick(sgIdx); }
+    else if (e.key === 'Escape') sgClose();
+  });
+  document.addEventListener('pointerdown', function (e) {
+    if (!sgBox) return;
+    var o = e.target.closest('.sugg2 [data-i]');
+    if (o) { e.preventDefault(); sgPick(+o.dataset.i); } else if (!sgBox.contains(e.target) && e.target !== sgFor) sgClose();
+  });
+  window.addEventListener('resize', sgPlace);
+  document.addEventListener('scroll', sgPlace, true);
+
   // ---------- Phone menu ----------
   $$('[data-menu-btn]').forEach(function (b) {
     b.addEventListener('click', function () { var side = b.closest('.side'), open = side.classList.toggle('open'); b.setAttribute('aria-expanded', open ? 'true' : 'false'); });

@@ -118,4 +118,33 @@ class Rx
             DB::table('medicines')->where('clinic_id', $clinicId)->whereIn('name', array_column($rows, 'name'))->increment('uses');
         }
     }
+
+    /** RxTerms answer → [{name: "Amoxicillin 500 mg", form: "Capsule"}], at most 15. */
+    public static function parseRxTerms(array $j): array
+    {
+        $names = $j[1] ?? [];
+        $forms = $j[2]['STRENGTHS_AND_FORMS'] ?? [];
+        $kind = ['tab' => 'Tablet', 'cap' => 'Capsule', 'susp' => 'Syrup', 'syrup' => 'Syrup', 'soln' => 'Syrup', 'gel' => 'Gel', 'cream' => 'Ointment', 'oint' => 'Ointment', 'paste' => 'Paste', 'mouthwash' => 'Mouthwash', 'rinse' => 'Mouthwash', 'inj' => 'Injection', 'drops' => 'Drops'];
+        $out = [];
+        foreach ($names as $i => $full) {
+            if (! is_string($full)) continue;
+            $base = trim(preg_replace('/\s*\(.*\)\s*$/', '', $full));
+            $list = is_array($forms[$i] ?? null) ? $forms[$i] : [];
+            if (! $list) $out[] = ['name' => $base, 'form' => null];
+            foreach ($list as $sf) {
+                $sf = trim((string) $sf);
+                $form = null;
+                foreach ($kind as $k => $v) {
+                    if (preg_match('/\b'.$k.'\b/i', $sf)) { $form = $v; break; }
+                }
+                // "500 mg Cap" → "500 mg"; "0.12 % Mouthwash" → "0.12%"
+                $strength = trim(preg_replace('/\s+(tab|cap|susp|syrup|soln|gel|cream|oint|paste|mouthwash|rinse|inj|drops|chewable|er|dr|odt|disintegrating|oral|topical|ophthalmic|otic|nasal|spray|powder|lozenge|film|patch|kit)\b.*$/i', '', $sf));
+                $strength = str_replace(' %', '%', $strength);
+                $out[] = ['name' => trim($base.' '.$strength), 'form' => $form];
+                if (count($out) >= 15) break 2;
+            }
+        }
+        $seen = [];
+        return array_values(array_filter($out, function ($m) use (&$seen) { $k = mb_strtolower($m['name']); if (isset($seen[$k])) return false; return $seen[$k] = true; }));
+    }
 }

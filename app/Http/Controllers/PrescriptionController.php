@@ -229,6 +229,35 @@ class PrescriptionController extends Controller
         return Medicine::where('clinic_id', $me->clinic_id)->where('active', true)->orderByDesc('uses')->orderBy('name')->get(['name', 'form', 'dose', 'timing', 'days']);
     }
 
+    /**
+     * Medicine names from the free U.S. National Library of Medicine list (RxTerms), for names not in the library.
+     * Generic names with strengths only; Indian brand names are not in it. Answers are kept for a day.
+     */
+    public function onlineMedicines(Request $r)
+    {
+        $q = trim((string) $r->query('q', ''));
+        if (mb_strlen($q) < 3 || mb_strlen($q) > 60) {
+            return response()->json([]);
+        }
+        $key = 'rxterms:'.mb_strtolower($q);
+        $hit = \Illuminate\Support\Facades\Cache::get($key);
+        if ($hit !== null) {
+            return response()->json($hit);
+        }
+        try {
+            $res = \Illuminate\Support\Facades\Http::connectTimeout(4)->timeout(6)->acceptJson()
+                ->get('https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search', ['terms' => $q, 'ef' => 'STRENGTHS_AND_FORMS', 'maxList' => 8]);
+            if (! $res->ok()) {
+                return response()->json(['error' => 'Online search is not answering right now.'], 502);
+            }
+            $out = Rx::parseRxTerms($res->json() ?? []);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'Online search is not answering right now.'], 502);
+        }
+        \Illuminate\Support\Facades\Cache::put($key, $out, now()->addDay());
+        return response()->json($out);
+    }
+
     public function medicines()
     {
         $me = $this->me();
