@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Activity;
+use App\Models\Medicine;
 use App\Models\Patient;
 use App\Models\RxTemplate;
 use App\Models\TreatmentPrice;
@@ -57,6 +58,7 @@ class PrescriptionController extends Controller
             'procedures' => \App\Models\Procedure::where('clinic_id', $me->clinic_id)->where('active', true)->orderBy('name')->pluck('name')
                 ->merge(TreatmentPrice::where('clinic_id', $me->clinic_id)->where('active', true)->pluck('name'))->unique(fn ($n) => mb_strtolower($n))->sort()->values(),
             'today' => Fmt::today(),
+            'medLib' => self::medLib($me),
             'chairs' => \App\Models\Chair::where('clinic_id', $me->clinic_id)->where('active', true)->orderBy('id')->get(['id', 'name']),
             'upcoming' => $patient ? \App\Models\Appointment::where(['clinic_id' => $me->clinic_id, 'patient_id' => $patient->id])->where('date', '>=', Fmt::today())->where('status', '!=', 'CANCELLED')->orderBy('date')->orderBy('start_min')->limit(3)->get(['date', 'start_min']) : collect(),
         ];
@@ -106,6 +108,7 @@ class PrescriptionController extends Controller
             }
             return $visit;
         });
+        Rx::learnMedicines($me->clinic_id, $meds, true);
         Activity::log($me, 'Saved visit', "$patient->name · ".($v['procedure'] ?: $v['complaint'] ?: 'Visit').' · '.count($meds).' medicines');
         $booked = $this->bookNext($me, $patient, $visit->doctor_id, $booking);
         return redirect()->route('rx.show', $visit)->with('ok', 'Visit saved.'.$booked.' Print the prescription below.');
@@ -126,6 +129,7 @@ class PrescriptionController extends Controller
             $visit->medicines()->delete();
             $visit->medicines()->createMany($meds);
         });
+        Rx::learnMedicines($me->clinic_id, $meds);
         Activity::log($me, 'Changed visit', $visit->patient->name.' · '.Fmt::date($visit->date));
         $booked = $this->bookNext($me, $visit->patient, $visit->doctor_id, $booking);
         return redirect()->route('rx.show', $visit)->with('ok', 'Visit updated.'.$booked);
@@ -217,6 +221,73 @@ class PrescriptionController extends Controller
         return back()->with('ok', "$procedure->name deleted. Old visits keep it.");
     }
 
+    // ---------- Medicine library ----------
+
+    /** Active library medicines, most used first, for the name suggestions on the visit form. */
+    public static function medLib(User $me)
+    {
+        return Medicine::where('clinic_id', $me->clinic_id)->where('active', true)->orderByDesc('uses')->orderBy('name')->get(['name', 'form', 'dose', 'timing', 'days']);
+    }
+
+    public function medicines()
+    {
+        $me = $this->me();
+        return view('rx.medicines', ['all' => Medicine::where('clinic_id', $me->clinic_id)->orderByDesc('active')->orderBy('name')->get()]);
+    }
+
+    private function medFields(Request $r): array
+    {
+        $v = $r->validate([
+            'name' => 'required|string|min:2|max:150',
+            'form' => 'nullable|string|max:20',
+            'dose' => 'nullable|string|max:40',
+            'timing' => 'nullable|string|max:60',
+            'days' => 'nullable|string|max:30',
+        ], ['name.required' => 'Write the medicine name with its strength, e.g. Amoxicillin 500 mg.']);
+        return array_map(fn ($x) => is_string($x) ? (trim($x) === '' ? null : trim($x)) : $x, $v);
+    }
+
+    public function addMedicine(Request $r)
+    {
+        $me = $this->me();
+        $v = $this->medFields($r);
+        if (Medicine::where('clinic_id', $me->clinic_id)->where('name', $v['name'])->exists()) {
+            return back()->withInput()->with('error', "{$v['name']} is already in the library.");
+        }
+        Medicine::create($v + ['clinic_id' => $me->clinic_id]);
+        Activity::log($me, 'Added medicine', $v['name']);
+        return back()->with('ok', "{$v['name']} added.");
+    }
+
+    public function updateMedicine(Request $r, Medicine $medicine)
+    {
+        $this->own($medicine);
+        $v = $this->medFields($r);
+        if (Medicine::where('clinic_id', $medicine->clinic_id)->where('name', $v['name'])->whereKeyNot($medicine->id)->exists()) {
+            return response()->json(['error' => "{$v['name']} is already in the library."], 422);
+        }
+        $medicine->update($v);
+        Activity::log($this->me(), 'Changed medicine', $medicine->name);
+        return response()->json(['ok' => true]);
+    }
+
+    public function medicineActive(Request $r, Medicine $medicine)
+    {
+        $this->own($medicine);
+        $medicine->update(['active' => $r->boolean('active')]);
+        Activity::log($this->me(), $medicine->active ? 'Turned on medicine' : 'Turned off medicine', $medicine->name);
+        return $r->expectsJson() ? response()->json(['ok' => true]) : back();
+    }
+
+    public function destroyMedicine(Medicine $medicine)
+    {
+        $this->own($medicine);
+        abort_unless($this->me()->isAdmin(), 403, 'Only the admin can delete permanently.');
+        $medicine->delete();
+        Activity::log($this->me(), 'Deleted medicine', $medicine->name);
+        return back()->with('ok', "$medicine->name deleted. Old prescriptions keep it.");
+    }
+
     // ---------- Templates ----------
 
     public function templates(Request $r)
@@ -224,7 +295,7 @@ class PrescriptionController extends Controller
         $me = $this->me();
         $all = RxTemplate::where('clinic_id', $me->clinic_id)->orderByDesc('active')->orderBy('name')->get();
         $edit = $r->query('new') ? null : ($all->firstWhere('id', (int) $r->query('t')) ?? $all->first());
-        return view('rx.templates', ['all' => $all, 'edit' => $edit, 'defaultTpl' => $me->clinic->rx_template_id]);
+        return view('rx.templates', ['all' => $all, 'edit' => $edit, 'defaultTpl' => $me->clinic->rx_template_id, 'medLib' => self::medLib($me)]);
     }
 
     public function saveTemplate(Request $r, ?RxTemplate $template = null)
@@ -245,6 +316,7 @@ class PrescriptionController extends Controller
         ]);
         $meds = array_values(array_filter(array_map(fn ($m) => array_intersect_key($m, array_flip(['name', 'form', 'dose', 'timing', 'days'])), $v['meds'] ?? []), fn ($m) => trim($m['name'] ?? '') !== ''));
         $data = ['name' => $v['name'], 'advice' => $v['advice'] ?? null, 'meds' => $meds];
+        Rx::learnMedicines($me->clinic_id, $meds);
         if ($template?->exists) {
             $template->update($data);
             Activity::log($me, 'Changed prescription template', $template->name);

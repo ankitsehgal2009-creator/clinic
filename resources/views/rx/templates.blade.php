@@ -5,9 +5,9 @@
 @section('content')
 <div class="ph">
   <div><h1>Prescription templates</h1><p>Save common prescriptions once and load them with one tap. The default one loads first on every new visit.</p></div>
-  <div class="row"><a class="btn" href="{{ route('rx.index') }}">Back to prescriptions</a><a class="btn pri" href="{{ route('rx.templates', ['new' => 1]) }}">+ New template</a></div>
+  <div class="row"><a class="btn" href="{{ route('rx.medicines') }}">Medicine library</a><a class="btn" href="{{ route('rx.index') }}">Back to prescriptions</a><a class="btn pri" href="{{ route('rx.templates', ['new' => 1]) }}">+ New template</a></div>
 </div>
-<div class="billgrid" style="grid-template-columns:minmax(260px,1fr) minmax(0,1.8fr)">
+<div class="billgrid tplgrid">
   <div class="card" style="padding:8px">
     @forelse ($all as $t)
       <a class="tpl-row {{ $edit?->id === $t->id ? 'on' : '' }} {{ $t->active ? '' : 'off' }}" href="{{ route('rx.templates', ['t' => $t->id]) }}">
@@ -33,16 +33,17 @@
     <div class="field" style="max-width:360px"><label for="tn">Template name</label><input id="tn" name="name" class="inp" required maxlength="80" value="{{ old('name', $edit?->name) }}" placeholder="e.g. Post RCT"></div>
     <datalist id="rx-forms">@foreach (Rx::FORMS as $f)<option value="{{ $f }}">@endforeach</datalist>
     <datalist id="rx-timings">@foreach (Rx::TIMINGS as $f)<option value="{{ $f }}">@endforeach</datalist>
-    <div class="tw" style="margin-top:12px"><table class="lines"><thead><tr><th>Medicine</th><th>Form</th><th>Dose</th><th>When</th><th>Days</th><th></th></tr></thead><tbody data-meds></tbody></table></div>
+    <datalist id="rx-meds">@foreach ($medLib as $m)<option value="{{ $m->name }}" data-form="{{ $m->form }}" data-dose="{{ $m->dose }}" data-timing="{{ $m->timing }}" data-days="{{ $m->days }}">@endforeach</datalist>
+    <div class="tw" style="margin-top:12px"><table class="lines meds"><thead><tr><th>Medicine</th><th>Form</th><th>Dose</th><th>When</th><th>Days</th><th></th></tr></thead><tbody data-meds></tbody></table></div>
     <template id="med-tpl"><tr>
-      <td style="min-width:200px"><input class="inp" data-f="name" placeholder="e.g. Amoxicillin 500 mg" aria-label="Medicine"></td>
-      <td style="width:115px"><input class="inp" data-f="form" list="rx-forms" aria-label="Form"></td>
+      <td style="min-width:200px"><input class="inp" data-f="name" list="rx-meds" autocomplete="off" placeholder="e.g. Amoxicillin 500 mg" aria-label="Medicine"></td>
+      <td style="width:115px"><input class="inp" data-f="form" list="rx-forms" placeholder="Form" aria-label="Form"></td>
       <td style="width:105px"><input class="inp mono" data-f="dose" placeholder="1-0-1" aria-label="Dose"></td>
-      <td style="width:140px"><input class="inp" data-f="timing" list="rx-timings" aria-label="When"></td>
+      <td style="width:140px"><input class="inp" data-f="timing" list="rx-timings" placeholder="When" aria-label="When"></td>
       <td style="width:95px"><input class="inp" data-f="days" placeholder="5 days" aria-label="Days"></td>
       <td><button type="button" class="btn sm" data-del aria-label="Remove medicine">✕</button></td>
     </tr></template>
-    <button type="button" class="btn" style="margin-top:12px" data-add>+ Add medicine</button>
+    <div class="row" style="margin-top:12px"><button type="button" class="btn" data-add>+ Add medicine</button><a class="btn" href="{{ route('rx.medicines') }}">Medicine library</a></div>
     <div class="field" style="margin-top:12px"><label for="ta">Advice printed below</label><textarea id="ta" name="advice" class="inp" rows="3" maxlength="2000">{{ old('advice', $edit?->advice) }}</textarea></div>
     <p class="hint">Dose is morning-afternoon-night, so 1-0-1 means one in the morning and one at night. Turn a template off to hide it from new visits.</p>
     <div class="row" style="margin-top:6px"><button class="btn pri">Save template</button></div>

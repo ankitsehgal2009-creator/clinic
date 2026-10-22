@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
         TreatmentPrice::seedDefaults($c->id);
         Rx::seedTemplates($c->id);
         Rx::seedProcedures($c->id);
+        Rx::seedMedicines($c->id);
         $c->update(['booking_slug' => 'smilecraft', 'booking_on' => true]);
         $chairs = collect([1, 2, 3])->map(fn ($n) => Chair::create(['clinic_id' => $c->id, 'name' => "Chair $n"]));
         $admin = User::create(['clinic_id' => $c->id, 'name' => 'Vikram Mehta', 'username' => 'vikram', 'mobile' => '9820077134', 'role' => 'ADMIN', 'password' => 'demo1234']);

@@ -20,6 +20,8 @@ class AppointmentController extends Controller
         $today = Fmt::today();
         $date = Fmt::isDate($r->query('date')) ? $r->query('date') : $today;
         $view = in_array($r->query('view'), ['week', 'month'], true) ? $r->query('view') : 'day';
+        // Day view opens as the chair calendar; "List" keeps the table with status and reschedule.
+        $layout = $r->query('layout') === 'list' ? 'list' : 'grid';
         [$from, $to] = [$date, $date];
         if ($view === 'week') {
             $from = Fmt::addDays($date, -((int) date('N', strtotime($date)) - 1));
@@ -32,7 +34,9 @@ class AppointmentController extends Controller
             ->where('clinic_id', $me->clinic_id)->whereBetween('date', [$from, $to])
             ->orderBy('date')->orderBy('start_min')->get();
         return view('appointments.index', [
-            'date' => $date, 'view' => $view, 'from' => $from, 'to' => $to, 'today' => $today, 'appts' => $appts,
+            'date' => $date, 'view' => $view, 'layout' => $layout, 'from' => $from, 'to' => $to, 'today' => $today, 'appts' => $appts,
+            'clinic' => $me->clinic, 'nowMin' => Fmt::nowMinutes(),
+            'doctors' => User::where('clinic_id', $me->clinic_id)->where('role', 'DOCTOR')->where('active', true)->get(['id', 'name']),
             'live' => $appts->where('status', '!=', 'CANCELLED'),
             'chairs' => Chair::where('clinic_id', $me->clinic_id)->where('active', true)->orderBy('id')->get(['id', 'name']),
         ]);
@@ -64,10 +68,10 @@ class AppointmentController extends Controller
         ], ['patient_id.required' => 'Pick a patient from the suggestions.', 'start_min.required' => 'Pick a free slot.']);
         $patient = Patient::where('clinic_id', $me->clinic_id)->where('active', true)->find($v['patient_id']);
         if (! $patient) {
-            return back()->withInput()->with('error', 'Pick a patient from the suggestions.');
+            return $r->expectsJson() ? response()->json(['error' => 'Pick a patient from the suggestions.'], 422) : back()->withInput()->with('error', 'Pick a patient from the suggestions.');
         }
         if ($problem = $this->checkSlot($me->clinic, $v['date'], (int) $v['chair_id'], (int) $v['start_min'])) {
-            return back()->withInput()->with('error', $problem);
+            return $r->expectsJson() ? response()->json(['error' => $problem], 422) : back()->withInput()->with('error', $problem);
         }
         $doctor = ! empty($v['doctor_id']) ? User::where('clinic_id', $me->clinic_id)->where('role', 'DOCTOR')->find($v['doctor_id']) : null;
         Appointment::create([
@@ -75,6 +79,10 @@ class AppointmentController extends Controller
             'date' => $v['date'], 'start_min' => $v['start_min'], 'duration' => $me->clinic->slot_minutes, 'treatment' => $v['treatment'] ?? null,
         ]);
         Activity::log($me, 'Booked appointment', "$patient->name · ".Fmt::date($v['date']).' '.Fmt::time($v['start_min']));
+        if ($r->expectsJson()) {
+            session()->flash('ok', "Booked $patient->name at ".Fmt::time($v['start_min']).'.');
+            return response()->json(['ok' => true]);
+        }
         return redirect()->route('appointments.index', ['date' => $v['date']])->with('ok', "Booked $patient->name at ".Fmt::time($v['start_min']).'.');
     }
 

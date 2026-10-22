@@ -148,6 +148,33 @@ class BillingController extends Controller
         return view('billing.show', ['inv' => $invoice, 'c' => $this->me()->clinic]);
     }
 
+    /** Everything a patient was charged and paid, oldest first, with the running balance. */
+    public function statement(Patient $patient)
+    {
+        $this->own($patient);
+        $bills = $patient->invoices()->with('items:id,invoice_id,name,tooth')->orderBy('date')->orderBy('id')->get();
+        $rows = [];
+        foreach ($bills as $b) {
+            $what = $b->items->map(fn ($i) => $i->name.($i->tooth ? ' ('.$i->tooth.')' : ''))->implode(', ');
+            $rows[] = ['date' => $b->date, 'at' => $b->created_at, 'kind' => 'bill', 'bill' => $b, 'what' => $what, 'charge' => $b->cancelled_at ? 0 : $b->total, 'paid' => 0];
+        }
+        $pays = Payment::with('invoice:id,number,cancelled_at', 'receiver:id,name')->where('patient_id', $patient->id)->where('clinic_id', $patient->clinic_id)->get();
+        foreach ($pays as $p) {
+            $rows[] = ['date' => $p->date, 'at' => $p->created_at, 'kind' => 'pay', 'pay' => $p, 'bill' => $p->invoice, 'charge' => 0, 'paid' => $p->invoice?->cancelled_at ? 0 : $p->amount];
+        }
+        // Same day: the bill comes before the payments made against it.
+        usort($rows, fn ($a, $b) => [$a['date'], $a['kind'] === 'pay', $a['at']] <=> [$b['date'], $b['kind'] === 'pay', $b['at']]);
+        $bal = 0;
+        foreach ($rows as &$r) {
+            $bal += $r['charge'] - $r['paid'];
+            $r['balance'] = $bal;
+        }
+        unset($r);
+        $charged = array_sum(array_column($rows, 'charge'));
+        $paid = array_sum(array_column($rows, 'paid'));
+        return view('billing.statement', ['p' => $patient, 'rows' => $rows, 'charged' => $charged, 'paid' => $paid, 'balance' => $charged - $paid, 'c' => $this->me()->clinic]);
+    }
+
     /** Staff never delete a bill: they cancel it, and the number stays used. */
     public function cancel(Request $r, Invoice $invoice)
     {

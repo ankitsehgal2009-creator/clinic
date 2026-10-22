@@ -63,16 +63,17 @@
     </div>
     <datalist id="rx-forms">@foreach (Rx::FORMS as $f)<option value="{{ $f }}">@endforeach</datalist>
     <datalist id="rx-timings">@foreach (Rx::TIMINGS as $f)<option value="{{ $f }}">@endforeach</datalist>
-    <div class="tw"><table class="lines"><thead><tr><th>Medicine</th><th>Form</th><th>Dose</th><th>When</th><th>Days</th><th></th></tr></thead><tbody data-meds></tbody></table></div>
+    <datalist id="rx-meds">@foreach ($medLib as $m)<option value="{{ $m->name }}" data-form="{{ $m->form }}" data-dose="{{ $m->dose }}" data-timing="{{ $m->timing }}" data-days="{{ $m->days }}">@endforeach</datalist>
+    <div class="tw"><table class="lines meds"><thead><tr><th>Medicine</th><th>Form</th><th>Dose</th><th>When</th><th>Days</th><th></th></tr></thead><tbody data-meds></tbody></table></div>
     <template id="med-tpl"><tr>
-      <td style="min-width:220px"><input class="inp" data-f="name" placeholder="e.g. Amoxicillin 500 mg" aria-label="Medicine"></td>
-      <td style="width:120px"><input class="inp" data-f="form" list="rx-forms" aria-label="Form"></td>
+      <td style="min-width:220px"><input class="inp" data-f="name" list="rx-meds" autocomplete="off" placeholder="e.g. Amoxicillin 500 mg" aria-label="Medicine"></td>
+      <td style="width:120px"><input class="inp" data-f="form" list="rx-forms" placeholder="Form" aria-label="Form"></td>
       <td style="width:110px"><input class="inp mono" data-f="dose" placeholder="1-0-1" aria-label="Dose"></td>
-      <td style="width:150px"><input class="inp" data-f="timing" list="rx-timings" aria-label="When"></td>
+      <td style="width:150px"><input class="inp" data-f="timing" list="rx-timings" placeholder="When" aria-label="When"></td>
       <td style="width:100px"><input class="inp" data-f="days" placeholder="5 days" aria-label="Days"></td>
       <td><button type="button" class="btn sm" data-del aria-label="Remove medicine">✕</button></td>
     </tr></template>
-    <div class="row" style="margin-top:12px"><button type="button" class="btn" data-add>+ Add medicine</button><button type="button" class="btn" data-save-tpl="{{ route('rx.templates.store') }}">Save as new template</button></div>
+    <div class="row" style="margin-top:12px"><button type="button" class="btn" data-add>+ Add medicine</button><a class="btn" href="{{ route('rx.medicines') }}" target="_blank" rel="noopener">Medicine library</a><button type="button" class="btn" data-save-tpl="{{ route('rx.templates.store') }}">Save as new template</button></div>
     <p class="hint">Dose is morning-afternoon-night, so 1-0-1 means one in the morning and one at night.</p>
     <div class="field" style="margin-top:8px"><label for="adv">Advice printed below the medicines</label><textarea id="adv" name="advice" class="inp" rows="2" maxlength="2000" data-advice>{{ old('advice', $visit->advice ?? '') }}</textarea></div>
     <div class="field" style="margin-top:12px;max-width:320px"><label for="ds">Print design</label><select id="ds" name="design" class="inp">@foreach (Rx::DESIGNS as $k => [$n, $why])<option value="{{ $k }}" @selected(old('design', $visit->design ?? $me->clinic->rx_design) === $k)>{{ $n }}{{ $me->clinic->rx_design === $k ? ' (clinic default)' : '' }}</option>@endforeach</select></div>

@@ -22,7 +22,7 @@
   </div>
   <div class="card noprint">
     <h2>Visit notes</h2>
-    <table class="totals" style="width:100%">
+    <table class="totals kv" style="width:100%">
       <tr><td class="muted">Complaint</td><td style="text-align:left">{{ $visit->complaint ?: '—' }}</td></tr>
       <tr><td class="muted">Tooth</td><td style="text-align:left" class="mono">{{ $visit->teeth ?: '—' }}</td></tr>
       <tr><td class="muted">Procedure</td><td style="text-align:left">{{ $visit->procedure ?: '—' }}</td></tr>

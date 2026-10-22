@@ -61,4 +61,61 @@ class Rx
         }
         DB::table('clinics')->where('id', $clinicId)->update(['rx_template_id' => $first]);
     }
+
+    /** Starter medicine library: name, form, dose, when, days. Each clinic edits it and it learns new names from visits. */
+    public const MEDICINES = [
+        ['Amoxicillin 500 mg', 'Capsule', '1-1-1', 'After food', '5 days'],
+        ['Amoxicillin + Clavulanic acid 625 mg', 'Tablet', '1-0-1', 'After food', '5 days'],
+        ['Metronidazole 400 mg', 'Tablet', '1-1-1', 'After food', '5 days'],
+        ['Ornidazole 500 mg', 'Tablet', '1-0-1', 'After food', '5 days'],
+        ['Azithromycin 500 mg', 'Tablet', '1-0-0', 'Before food', '3 days'],
+        ['Clindamycin 300 mg', 'Capsule', '1-1-1', 'After food', '5 days'],
+        ['Cefixime 200 mg', 'Tablet', '1-0-1', 'After food', '5 days'],
+        ['Doxycycline 100 mg', 'Capsule', '1-0-1', 'After food', '7 days'],
+        ['Ibuprofen 400 mg + Paracetamol 325 mg', 'Tablet', '1-0-1', 'After food', '3 days'],
+        ['Aceclofenac 100 mg + Paracetamol 325 mg', 'Tablet', '1-0-1', 'After food', '3 days'],
+        ['Aceclofenac 100 mg + Paracetamol 325 mg + Serratiopeptidase 15 mg', 'Tablet', '1-0-1', 'After food', '5 days'],
+        ['Diclofenac 50 mg', 'Tablet', '1-0-1', 'After food', '3 days'],
+        ['Ketorolac 10 mg', 'Tablet', 'SOS', 'After food', '2 days'],
+        ['Paracetamol 650 mg', 'Tablet', '1-1-1', 'After food', '3 days'],
+        ['Paracetamol syrup 250 mg/5 ml', 'Syrup', '5 ml SOS', 'After food', '3 days'],
+        ['Ibuprofen syrup 100 mg/5 ml', 'Syrup', '5 ml SOS', 'After food', '3 days'],
+        ['Amoxicillin syrup 250 mg/5 ml', 'Syrup', '5 ml thrice', 'After food', '5 days'],
+        ['Pantoprazole 40 mg', 'Tablet', '1-0-0', 'Before breakfast', '5 days'],
+        ['Rabeprazole 20 mg', 'Tablet', '1-0-0', 'Before breakfast', '5 days'],
+        ['Chlorhexidine 0.2%', 'Mouthwash', '10 ml twice', 'After brushing', '7 days'],
+        ['Povidone iodine 2% gargle', 'Mouthwash', '10 ml thrice', 'After food', '7 days'],
+        ['Benzydamine 0.15%', 'Mouthwash', '15 ml thrice', 'After food', '7 days'],
+        ['Lignocaine 2% gel', 'Gel', 'Apply thrice', 'Before food', '5 days'],
+        ['Choline salicylate + Lignocaine gel', 'Gel', 'Apply thrice', 'After food', '5 days'],
+        ['Triamcinolone 0.1% oral paste', 'Paste', 'Apply twice', 'At bedtime', '5 days'],
+        ['Metronidazole + Chlorhexidine gel', 'Gel', 'Apply twice', 'After brushing', '7 days'],
+        ['Potassium nitrate 5% toothpaste', 'Paste', 'Twice daily', 'After brushing', '30 days'],
+        ['Clotrimazole 1% mouth paint', 'Gel', 'Apply thrice', 'After food', '7 days'],
+        ['Vitamin B-complex', 'Capsule', '1-0-0', 'After food', '15 days'],
+        ['Tranexamic acid 500 mg', 'Tablet', '1-1-1', 'After food', '2 days'],
+    ];
+
+    public static function seedMedicines(int $clinicId): void
+    {
+        $now = now();
+        DB::table('medicines')->insertOrIgnore(array_map(fn ($m) => ['clinic_id' => $clinicId, 'name' => $m[0], 'form' => $m[1], 'dose' => $m[2], 'timing' => $m[3], 'days' => $m[4], 'active' => true, 'created_at' => $now, 'updated_at' => $now], self::MEDICINES));
+    }
+
+    /** Adds medicine names the library does not know yet (with the dose just written) and counts each use. */
+    public static function learnMedicines(int $clinicId, array $meds, bool $count = false): void
+    {
+        $now = now();
+        $rows = [];
+        foreach ($meds as $m) {
+            $name = trim((string) ($m['name'] ?? ''));
+            if ($name === '' || isset($rows[mb_strtolower($name)])) continue;
+            $rows[mb_strtolower($name)] = ['clinic_id' => $clinicId, 'name' => mb_substr($name, 0, 150), 'form' => $m['form'] ?? null ?: null, 'dose' => $m['dose'] ?? null ?: null, 'timing' => $m['timing'] ?? null ?: null, 'days' => $m['days'] ?? null ?: null, 'active' => true, 'created_at' => $now, 'updated_at' => $now];
+        }
+        if (! $rows) return;
+        DB::table('medicines')->insertOrIgnore(array_values($rows));
+        if ($count) {
+            DB::table('medicines')->where('clinic_id', $clinicId)->whereIn('name', array_column($rows, 'name'))->increment('uses');
+        }
+    }
 }

@@ -70,6 +70,9 @@ class PatientController extends Controller
             'medical_history' => array_values(array_unique($v['history'] ?? [])),
         ]));
         Activity::log($me, 'Added patient', "$patient->name · $patient->code");
+        if ($r->expectsJson()) {
+            return response()->json(['id' => $patient->id, 'name' => $patient->name, 'code' => $patient->code, 'mobile' => $patient->mobile]);
+        }
         return $r->input('then') === 'book'
             ? redirect()->route('appointments.create', ['patient' => $patient->id])
             : redirect()->route('patients.show', $patient);

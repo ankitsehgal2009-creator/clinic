@@ -13,9 +13,10 @@
   </p></div>
   <div class="row">
     <div class="row">
-      <a class="btn sm" href="{{ route('appointments.index', ['date' => $shift(-1), 'view' => $view]) }}" aria-label="Previous">‹</a>
-      <div data-datepicker data-value="{{ $date }}" data-go="{{ route('appointments.index', ['view' => $view]) }}"></div>
-      <a class="btn sm" href="{{ route('appointments.index', ['date' => $shift(1), 'view' => $view]) }}" aria-label="Next">›</a>
+      @php($keep = $view === 'day' && $layout === 'list' ? ['layout' => 'list'] : [])
+      <a class="btn sm" href="{{ route('appointments.index', ['date' => $shift(-1), 'view' => $view] + $keep) }}" aria-label="Previous">‹</a>
+      <div data-datepicker data-value="{{ $date }}" data-go="{{ route('appointments.index', ['view' => $view] + $keep) }}"></div>
+      <a class="btn sm" href="{{ route('appointments.index', ['date' => $shift(1), 'view' => $view] + $keep) }}" aria-label="Next">›</a>
       <div class="pills">@foreach (['day', 'week', 'month'] as $v)<a class="{{ $view === $v ? 'on' : '' }}" href="{{ route('appointments.index', ['date' => $date, 'view' => $v]) }}">{{ ucfirst($v) }}</a>@endforeach</div>
     </div>
     <a class="btn pri" href="{{ route('appointments.create', ['date' => max($date, $today)]) }}">Book appointment</a>
@@ -23,6 +24,20 @@
 </div>
 
 @if ($view === 'day')
+<div class="row" style="justify-content:space-between;margin-bottom:12px">
+  <div class="pills" aria-label="Show as">
+    <a class="{{ $layout === 'grid' ? 'on' : '' }}" href="{{ route('appointments.index', ['date' => $date]) }}">Calendar</a>
+    <a class="{{ $layout === 'list' ? 'on' : '' }}" href="{{ route('appointments.index', ['date' => $date, 'layout' => 'list']) }}">List</a>
+  </div>
+  @if ($layout === 'grid')<small class="muted">Tap a free time to book. Tap a name to open the patient file.</small>@endif
+</div>
+@endif
+
+@if ($view === 'day' && $layout === 'grid')
+@include('appointments.grid')
+@endif
+
+@if ($view === 'day' && $layout === 'list')
 <div class="tw"><table>
   <thead><tr><th>Time</th><th>Patient</th><th>Treatment</th><th>Chair</th><th>Status</th></tr></thead>
   <tbody>
@@ -75,7 +90,7 @@
       <a class="dh {{ $d === $today ? 'now' : '' }}" href="{{ route('appointments.index', ['date' => $d]) }}"><b>{{ date('D, j M', strtotime($d)) }}</b><br><small class="muted">{{ $list->where('status', '!=', 'CANCELLED')->count() }} appointments</small></a>
       <div class="stack" style="gap:5px;padding:6px">
         @foreach ($list as $a)
-          <div class="ev {{ $a->status === 'CANCELLED' ? 'off' : '' }}"><span class="mono">{{ Fmt::time($a->start_min) }}</span> {{ $a->patient->name }}<br><small class="muted">{{ $a->treatment }} · {{ $a->chair?->name }} · {{ Status::label($a->status) }}</small></div>
+          <div class="ev {{ $a->status === 'CANCELLED' ? 'off' : '' }}"><span class="mono">{{ Fmt::time($a->start_min) }}</span> <a href="{{ route('patients.show', $a->patient_id) }}">{{ $a->patient->name }}</a><br><small class="muted">{{ $a->treatment }} · {{ $a->chair?->name }} · {{ Status::label($a->status) }}</small></div>
         @endforeach
       </div>
     </div>

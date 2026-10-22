@@ -3,8 +3,8 @@
 @section('body')
 <div class="shell">
   <aside class="side" aria-label="Main menu">
-    <div class="brand">@if ($me->clinic->logo)<div class="logo img"><img src="{{ $me->clinic->logo }}" alt=""></div>@else<div class="logo">S</div>@endif<div><b>SmileDesk</b><span>{{ $me->clinic->name }}</span></div></div>
-    <nav>
+    <div class="brand">@if ($me->clinic->logo)<div class="logo img"><img src="{{ $me->clinic->logo }}" alt=""></div>@else<div class="logo">S</div>@endif<div><b>SmileDesk</b><span>{{ $me->clinic->name }}</span></div><button type="button" class="menu-btn" aria-expanded="false" aria-controls="mainnav" data-menu-btn><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button></div>
+    <nav id="mainnav">
       @php($cur = (string) request()->route()?->getName())
       @php($active = collect(\App\Support\Pages::PAGES)->keys()->first(fn ($k) => explode('.', \App\Support\Pages::PAGES[$k]['route'])[0] === explode('.', $cur)[0]))
       @foreach (\App\Support\Pages::PAGES as $key => $p)

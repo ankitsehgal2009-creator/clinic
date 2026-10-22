@@ -114,6 +114,7 @@ class AuthController extends Controller
             TreatmentPrice::seedDefaults($clinic->id);
             \App\Support\Rx::seedTemplates($clinic->id);
             \App\Support\Rx::seedProcedures($clinic->id);
+            \App\Support\Rx::seedMedicines($clinic->id);
             $clinic->update(['booking_slug' => BookingController::freeSlug($clinic->name)]);
             for ($i = 1; $i <= $c['chairs']; $i++) {
                 Chair::create(['clinic_id' => $clinic->id, 'name' => "Chair $i"]);

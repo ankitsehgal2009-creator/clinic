@@ -4,7 +4,7 @@
 @section('content')
 <div class="ph">
   <div><h1>Procedures</h1><p>The list doctors pick from in "Procedure done" on a visit. Add your own, or turn off the ones you never use.</p></div>
-  <div class="row"><a class="btn" href="{{ route('rx.templates') }}">Prescription templates</a><a class="btn" href="{{ route('rx.index') }}">Back to prescriptions</a></div>
+  <div class="row"><a class="btn" href="{{ route('rx.medicines') }}">Medicine library</a><a class="btn" href="{{ route('rx.templates') }}">Prescription templates</a><a class="btn" href="{{ route('rx.index') }}">Back to prescriptions</a></div>
 </div>
 <form method="post" action="{{ route('rx.procedures.store') }}" class="card row" style="margin-bottom:16px;flex-wrap:nowrap">
   @csrf

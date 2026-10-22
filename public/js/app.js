@@ -22,8 +22,37 @@
   function fmtTime(min) { var h = Math.floor(min / 60), ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + pad(min % 60) + ' ' + ap; }
 
   /** JSON request with the CSRF token. Rejects with a readable message. */
+  // ---------- Loading bar: page changes, form saves and every request to the server ----------
+  var bar = el('div', { class: 'loadbar', 'aria-hidden': 'true' }, '<i></i>'), busyN = 0, barTimer;
+  document.body.appendChild(bar);
+  function loadOn() { clearTimeout(barTimer); bar.classList.remove('done'); bar.classList.add('on'); }
+  function loadOff() { bar.classList.add('done'); barTimer = setTimeout(function () { bar.classList.remove('on', 'done'); }, 300); }
+  function track(p) { busyN++; loadOn(); var end = function () { if (--busyN <= 0) { busyN = 0; loadOff(); } }; p.then(end, end); return p; }
+  var leaveTimer;
+  function leaving(btn) {
+    loadOn(); document.documentElement.classList.add('leaving');
+    if (btn && btn.classList.contains('btn')) btn.classList.add('busy');
+    // Downloads and print pages never leave this page, so give up after a while.
+    clearTimeout(leaveTimer); leaveTimer = setTimeout(function () { settle(); }, 12000);
+  }
+  function settle() { loadOff(); document.documentElement.classList.remove('leaving'); $$('.btn.busy').forEach(function (b) { b.classList.remove('busy'); }); }
+  window.addEventListener('pageshow', settle);
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest('a[href]');
+    if (!a || a.target === '_blank' || a.hasAttribute('download') || /[?&]download=|\/sample|\.(csv|png|jpe?g|pdf)$/i.test(a.href)) return;
+    var u = new URL(a.href, location.href);
+    if (u.origin !== location.origin || (u.pathname === location.pathname && u.search === location.search && u.hash)) return;
+    leaving(a);
+  });
+  // Bubble phase on window runs after every form's own submit handler, so a cancelled submit shows nothing.
+  window.addEventListener('submit', function (e) {
+    if (e.defaultPrevented || e.target.target === '_blank') return;
+    leaving(e.submitter || $('button:not([type=button])', e.target));
+  });
+
   function send(method, url, data) {
-    return fetch(url, {
+    return track(fetch(url, {
       method: method,
       headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': CSRF },
       body: data === undefined ? undefined : JSON.stringify(data),
@@ -33,11 +62,16 @@
         if (r.status === 419) throw new Error('Your session expired. Reload the page and try again.');
         throw new Error(j.error || j.message || 'Something went wrong. Check your connection and try again.');
       });
-    });
+    }));
   }
   function get(url) {
-    return fetch(url, { headers: { Accept: 'application/json' } }).then(function (r) { if (!r.ok) throw new Error('Could not load. Check your connection.'); return r.json(); });
+    return track(fetch(url, { headers: { Accept: 'application/json' } }).then(function (r) { if (!r.ok) throw new Error('Could not load. Check your connection.'); return r.json(); }));
   }
+
+  // ---------- Phone menu ----------
+  $$('[data-menu-btn]').forEach(function (b) {
+    b.addEventListener('click', function () { var side = b.closest('.side'), open = side.classList.toggle('open'); b.setAttribute('aria-expanded', open ? 'true' : 'false'); });
+  });
 
   // ---------- Small note in the corner: "Saved" after an automatic save, or what went wrong ----------
   var toastBox = null;
@@ -211,7 +245,7 @@
   }
 
   // ---------- Patient picker: suggestions after 3 letters, shows ID, mobile and relative ----------
-  function patientPicker(root, onChange) {
+  function patientPicker(root, onChange, onNew) {
     var q = $('[data-search]', root), list = $('.sugg', root), pid = $('[data-pid]', root), picked = $('[data-picked]', root), hint = $('[data-hint]', root);
     var hits = [], idx = 0, timer, pickedName = pid.value ? q.value : null;
     function show(open) { list.classList.toggle('hide', !open); q.setAttribute('aria-expanded', open ? 'true' : 'false'); }
@@ -220,7 +254,8 @@
         return '<div role="option" aria-selected="' + (i === idx) + '" class="sg' + (i === idx ? ' on' : '') + '" data-i="' + i + '"><div style="flex:1"><b>' + esc(h.name) + '</b><br><small class="muted"><span class="mono">' + esc(h.code) + '</span> · ' + esc(h.mobile) + (h.relative_name ? ' · ' + esc(h.relative_name) : '') + '</small></div>' +
           (h.age != null ? '<small class="muted">' + h.age + ' yrs</small>' : '') + '</div>';
       }).join('') + (hits.length ? '' : '<div class="sg muted">No registered patient matches "' + esc(q.value) + '".</div>') +
-        '<a class="sg" href="' + esc(window.NEW_PATIENT_URL) + '" style="color:var(--primary);font-weight:500">+ Add a new patient</a>';
+        (onNew ? '<button type="button" class="sg" data-new-sg style="color:var(--primary);font-weight:500;border:0;background:none;width:100%;text-align:left;font:inherit;cursor:pointer">+ Add "' + esc(q.value.trim()) + '" as a new patient</button>'
+          : window.NEW_PATIENT_URL ? '<a class="sg" href="' + esc(window.NEW_PATIENT_URL) + '" style="color:var(--primary);font-weight:500">+ Add a new patient</a>' : '');
       show(true);
     }
     function choose(h) {
@@ -243,10 +278,80 @@
       if (e.key === 'Enter') { e.preventDefault(); choose(hits[idx]); }
       if (e.key === 'Escape') show(false);
     });
-    list.addEventListener('mousedown', function (e) { var o = e.target.closest('[data-i]'); if (o) { e.preventDefault(); choose(hits[+o.dataset.i]); } });
+    list.addEventListener('mousedown', function (e) {
+      var o = e.target.closest('[data-i]'); if (o) { e.preventDefault(); choose(hits[+o.dataset.i]); }
+      if (onNew && e.target.closest('[data-new-sg]')) { e.preventDefault(); show(false); onNew(q.value.trim()); }
+    });
     q.addEventListener('blur', function () { setTimeout(function () { show(false); }, 150); });
-    return { id: function () { return pid.value; } };
+    return { id: function () { return pid.value; }, focus: function () { q.focus(); } };
   }
+
+  // ---------- Medicine library page: rows save on change; search filters ----------
+  $$('tr[data-med]').forEach(function (tr) {
+    $$('[data-f]', tr).forEach(function (i) {
+      i.addEventListener('change', function () {
+        var d = {}; $$('[data-f]', tr).forEach(function (x) { d[x.dataset.f] = x.value.trim(); });
+        if (d.name.length < 2) { toast('Write the medicine name.', true); return; }
+        send('POST', tr.dataset.med, d).then(function () { tr.dataset.name = d.name.toLowerCase(); toast('Saved'); }).catch(function (e) { toast(e.message, true); });
+      });
+    });
+  });
+  var medFind = $('[data-medfind]');
+  if (medFind) medFind.addEventListener('input', function () {
+    var q = medFind.value.trim().toLowerCase();
+    $$('tr[data-med]').forEach(function (tr) { tr.hidden = q && tr.dataset.name.indexOf(q) < 0; });
+  });
+
+  // ---------- Day calendar: tap a free slot to book there ----------
+  // Open the calendar where the day's work is: the first free slot from now, or the first appointment.
+  $$('.cal-wrap').forEach(function (w) {
+    var first = $('.cal-cell.free, .cal-appts', w), head = $('.cal-h', w);
+    if (first && first.offsetTop > w.clientHeight * 0.6) w.scrollTop = first.offsetTop - (head ? head.offsetHeight : 0) - 8;
+  });
+  var calbook = $('[data-calbook]');
+  if (calbook) $$('[data-cal-book]').forEach(function (cell) {
+    cell.addEventListener('click', function () {
+      var m = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Book appointment' });
+      m.appendChild($('#calbook-tpl').content.cloneNode(true));
+      document.body.appendChild(m);
+      var form = $('form', m), err = $('[data-err]', m), go = $('[data-go]', m), pick = $('[data-pick-part]', m), np = $('[data-new-part]', m), isNew = false;
+      $('[data-when]', m).textContent = fmtKey(calbook.dataset.date) + ' · ' + fmtTime(+cell.dataset.min) + ' · ' + cell.dataset.chairName;
+      function close() { m.remove(); cell.focus(); }
+      function fail(msg) { err.textContent = msg; err.classList.remove('hide'); go.classList.remove('busy'); go.disabled = false; }
+      function mode(n, typed) {
+        isNew = n; pick.classList.toggle('hide', n); np.classList.toggle('hide', !n); err.classList.add('hide');
+        if (n) {
+          var t = typed || '', digits = t.replace(/\D/g, '');
+          $('[data-np=name]', m).value = digits.length >= 6 ? '' : t; $('[data-np=mobile]', m).value = digits.length >= 6 ? digits : '';
+          $(digits.length >= 6 || !t ? '[data-np=name]' : '[data-np=mobile]', m).focus();
+        } else pp.focus();
+      }
+      var pp = patientPicker(pick, function () { err.classList.add('hide'); }, np ? function (t) { mode(true, t); } : null);
+      if (np) { $('[data-new]', m).addEventListener('click', function () { mode(true, $('#cb-q', m).value.trim()); }); $('[data-old]', m).addEventListener('click', function () { mode(false); }); }
+      $('[data-x]', m).addEventListener('click', close);
+      m.addEventListener('click', function (e) { if (e.target === m) close(); });
+      m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('.sugg', m).classList.contains('hide')) close(); });
+      form.addEventListener('submit', function (e) {
+        e.preventDefault(); err.classList.add('hide');
+        var patient;
+        if (isNew) {
+          var d = {}; $$('[data-np]', m).forEach(function (i) { if (i.value.trim()) d[i.dataset.np] = i.value.trim(); });
+          if (!d.name || d.name.length < 2) return fail("Enter the patient's full name.");
+          if (!d.mobile) return fail('Enter a mobile number.');
+          patient = send('POST', calbook.dataset.patientStore, d).then(function (p) { return p.id; });
+        } else {
+          if (!pp.id()) return fail('Pick a patient from the suggestions, or add a new patient.');
+          patient = Promise.resolve(pp.id());
+        }
+        go.disabled = true; go.classList.add('busy');
+        patient.then(function (id) {
+          var doc = $('[data-doctor]', m);
+          return send('POST', calbook.dataset.store, { patient_id: +id, date: calbook.dataset.date, chair_id: +cell.dataset.chair, start_min: +cell.dataset.min, doctor_id: doc ? +doc.value : null, treatment: $('[data-treatment]', m).value });
+        }).then(function () { leaving(); location.reload(); }).catch(function (e) { fail(e.message); });
+      });
+      pp.focus();
+    });
+  });
 
   // ---------- Book appointment ----------
   var booking = $('#booking');
@@ -378,7 +483,7 @@
       save.addEventListener('click', function () {
         save.disabled = true;
         send('POST', btn.dataset.move, { date: date, chair_id: +chair.value, start_min: slot })
-          .then(function () { location.href = location.pathname + '?date=' + date; })
+          .then(function () { location.href = location.pathname + '?layout=list&date=' + date; })
           .catch(function (e) { errBox.textContent = e.message; errBox.classList.remove('hide'); save.disabled = false; });
       });
       sp.load(date, chair.value, btn.dataset.id);
@@ -511,11 +616,11 @@
       errBox.classList.add('hide');
       var fd = new FormData(); fd.append('file', file);
       drop.style.opacity = '.6';
-      fetch(imp.dataset.read, { method: 'POST', body: fd, headers: { Accept: 'application/json', 'X-CSRF-TOKEN': CSRF } })
+      track(fetch(imp.dataset.read, { method: 'POST', body: fd, headers: { Accept: 'application/json', 'X-CSRF-TOKEN': CSRF } })
         .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || j.message || 'Could not read this file. Try saving it again as CSV.'); return j; }); })
         .then(function (j) { sheet = { name: j.name, headers: j.headers, rows: j.rows, map: j.headers.map(guess) }; drawMap(); step('map'); })
         .catch(function (e) { fail(e.message); })
-        .then(function () { drop.style.opacity = ''; });
+        .then(function () { drop.style.opacity = ''; }));
     }
     $('[data-file]', imp).addEventListener('change', function (e) { upload(e.target.files[0]); e.target.value = ''; });
     drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
@@ -773,6 +878,14 @@
     function rowsNow() {
       return [].map.call(body.children, function (tr) { var v = {}; $$('[data-f]', tr).forEach(function (i) { v[i.dataset.f] = i.value.trim(); }); return v; }).filter(function (v) { return v.name; });
     }
+    // Picking a library medicine fills its usual form, dose, timing and days.
+    body.addEventListener('input', function (e) {
+      var n = e.target.closest('[data-f="name"]'); if (!n) return;
+      var o = $$('#rx-meds option').filter(function (x) { return x.value.toLowerCase() === n.value.trim().toLowerCase(); })[0];
+      if (!o) return;
+      var tr = n.closest('tr');
+      ['form', 'dose', 'timing', 'days'].forEach(function (k) { var i = $('[data-f="' + k + '"]', tr); if (i && o.dataset[k]) i.value = o.dataset[k]; });
+    });
     body.addEventListener('click', function (e) {
       var d = e.target.closest('[data-del]');
       if (!d) return;

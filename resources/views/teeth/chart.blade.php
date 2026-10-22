@@ -5,16 +5,17 @@
   $up = 'M4 30 C3 20 3 12 6 6 C9 2 19 2 22 6 C25 12 25 20 24 30 C22 33 19 33 17 26 C15 22 13 22 11 26 C9 33 6 33 4 30Z';
   $lo = 'M4 4 C3 14 3 22 6 28 C9 32 19 32 22 28 C25 22 25 14 24 4 C22 1 19 1 17 8 C15 12 13 12 11 8 C9 1 6 1 4 4Z';
   $jaw = function (array $teeth) use ($chart, $up, $lo) {
-      $h = '<div class="jaw">';
+      // Two halves (patient's right, then left) so phones can stack them; wide screens keep one row.
+      $h = '<div class="jaw"><span class="half" data-side="Right">';
       foreach ($teeth as $i => $n) {
-          if ($i === count($teeth) / 2) $h .= '<span class="mid" aria-hidden="true"></span>';
+          if ($i === count($teeth) / 2) $h .= '</span><span class="mid" aria-hidden="true"></span><span class="half" data-side="Left">';
           $st = $chart['marks'][$n]['state'] ?? 'healthy';
           $upper = in_array(intdiv($n, 10), [1, 2, 5, 6], true);
           $has = isset($chart['history'][$n]) ? ' hist' : '';
           $h .= '<button type="button" class="tooth st-'.$st.$has.'" data-n="'.$n.'" aria-label="Tooth '.$n.', '.e(Teeth::name($n)).', '.e(Teeth::STATES[$st]).'">'
              .'<svg viewBox="0 0 28 34" aria-hidden="true"><path class="tb" d="'.($upper ? $up : $lo).'"/><path class="tx" d="M7 9l14 16M21 9 7 25"/><path class="tr" d="M14 8v18"/></svg><span>'.$n.'</span></button>';
       }
-      return $h.'</div>';
+      return $h.'</span></div>';
   };
   $names = [];
   foreach ([...Teeth::UPPER, ...Teeth::LOWER, ...Teeth::UPPER_CHILD, ...Teeth::LOWER_CHILD] as $n) $names[$n] = Teeth::name($n);

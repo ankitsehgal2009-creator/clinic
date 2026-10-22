@@ -79,6 +79,7 @@ Route::middleware(['auth', 'page'])->group(function () {
         Route::post('/billing/prices', [BillingController::class, 'savePrice'])->name('billing.prices.store');
         Route::post('/billing/prices/{price}', [BillingController::class, 'savePrice'])->name('billing.prices.update');
         Route::post('/billing/prices/{price}/active', [BillingController::class, 'priceActive'])->name('billing.prices.active');
+        Route::get('/billing/statement/{patient}', [BillingController::class, 'statement'])->name('billing.statement');
         Route::get('/billing/{invoice}', [BillingController::class, 'show'])->whereNumber('invoice')->name('billing.show');
         Route::post('/billing/{invoice}/pay', [BillingController::class, 'pay'])->name('billing.pay');
         Route::post('/billing/{invoice}/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
@@ -91,6 +92,11 @@ Route::middleware(['auth', 'page'])->group(function () {
         Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('rx.index');
         Route::get('/prescriptions/new', [PrescriptionController::class, 'create'])->name('rx.create');
         Route::post('/prescriptions', [PrescriptionController::class, 'store'])->name('rx.store');
+        Route::get('/prescriptions/medicines', [PrescriptionController::class, 'medicines'])->name('rx.medicines');
+        Route::post('/prescriptions/medicines', [PrescriptionController::class, 'addMedicine'])->name('rx.medicines.store');
+        Route::post('/prescriptions/medicines/{medicine}', [PrescriptionController::class, 'updateMedicine'])->name('rx.medicines.update');
+        Route::post('/prescriptions/medicines/{medicine}/active', [PrescriptionController::class, 'medicineActive'])->name('rx.medicines.active');
+        Route::delete('/prescriptions/medicines/{medicine}', [PrescriptionController::class, 'destroyMedicine'])->name('rx.medicines.destroy');
         Route::get('/prescriptions/procedures', [PrescriptionController::class, 'procedures'])->name('rx.procedures');
         Route::post('/prescriptions/procedures', [PrescriptionController::class, 'addProcedure'])->name('rx.procedures.store');
         Route::post('/prescriptions/procedures/{procedure}/active', [PrescriptionController::class, 'procedureActive'])->name('rx.procedures.active');

@@ -50,9 +50,9 @@
   <div class="card">
     <h2>Visits & prescriptions</h2>
     @if ($visits->isNotEmpty())
-      <div class="tw"><table><thead><tr><th>Date</th><th>Visit</th><th></th></tr></thead><tbody>
+      <div class="tw"><table class="mt"><thead><tr><th>Date</th><th>Visit</th><th></th></tr></thead><tbody>
         @foreach ($visits as $v)
-          <tr><td style="white-space:nowrap">{{ Fmt::date($v->date) }}</td><td>{{ $v->procedure ?: $v->complaint ?: 'Visit' }}<br><small class="muted">{{ $v->teeth ? 'Tooth '.$v->teeth.' · ' : '' }}{{ $v->doctor?->name }}</small>@if ($v->rx_photos || $v->xrays)<br><span class="photo-chip">{{ implode(' · ', array_filter([$v->rx_photos ? $v->rx_photos.' Rx '.($v->rx_photos === 1 ? 'photo' : 'photos') : null, $v->xrays ? $v->xrays.' '.($v->xrays === 1 ? 'X-ray' : 'X-rays') : null])) }}</span>@endif</td><td style="text-align:right"><a class="btn sm" href="{{ route('rx.show', $v) }}">View</a></td></tr>
+          <tr><td style="white-space:nowrap">{{ Fmt::date($v->date) }}</td><td class="mt-main">{{ $v->procedure ?: $v->complaint ?: 'Visit' }}<br><small class="muted">{{ $v->teeth ? 'Tooth '.$v->teeth.' · ' : '' }}{{ $v->doctor?->name }}</small>@if ($v->rx_photos || $v->xrays)<br><span class="photo-chip">{{ implode(' · ', array_filter([$v->rx_photos ? $v->rx_photos.' Rx '.($v->rx_photos === 1 ? 'photo' : 'photos') : null, $v->xrays ? $v->xrays.' '.($v->xrays === 1 ? 'X-ray' : 'X-rays') : null])) }}</span>@endif</td><td class="mt-end" style="text-align:right"><a class="btn sm" href="{{ route('rx.show', $v) }}">View</a></td></tr>
         @endforeach
       </tbody></table></div>
     @else
@@ -63,9 +63,9 @@
   <div class="card">
     <h2>Appointments</h2>
     @if ($appts->isNotEmpty())
-      <div class="tw"><table><thead><tr><th>Date</th><th>Time</th><th>Treatment</th><th>Status</th></tr></thead><tbody>
+      <div class="tw"><table class="mt"><thead><tr><th>Date</th><th>Time</th><th>Treatment</th><th>Status</th></tr></thead><tbody>
         @foreach ($appts as $a)
-          <tr class="{{ $a->status === 'CANCELLED' ? 'off' : '' }}"><td>{{ Fmt::date($a->date) }}</td><td class="mono">{{ Fmt::time($a->start_min) }}</td><td>{{ $a->treatment ?? '—' }}<br><small class="muted">{{ $a->chair?->name }}{{ $a->doctor ? ' · '.$a->doctor->name : '' }}</small></td><td><span class="chip {{ Status::cls($a->status) }}">{{ Status::label($a->status) }}</span></td></tr>
+          <tr class="{{ $a->status === 'CANCELLED' ? 'off' : '' }}"><td>{{ Fmt::date($a->date) }}</td><td class="mono">{{ Fmt::time($a->start_min) }}</td><td class="mt-main">{{ $a->treatment ?? '—' }}<br><small class="muted">{{ $a->chair?->name }}{{ $a->doctor ? ' · '.$a->doctor->name : '' }}</small></td><td class="mt-end"><span class="chip {{ Status::cls($a->status) }}">{{ Status::label($a->status) }}</span></td></tr>
         @endforeach
       </tbody></table></div>
     @else
@@ -74,12 +74,14 @@
   </div>
   @if ($bills !== null)
   <div class="card">
-    <h2>Bills</h2>
+    <div class="row" style="justify-content:space-between;align-items:baseline"><h2>Bills</h2>@if ($bills->isNotEmpty())<a class="btn sm" href="{{ route('billing.statement', $p) }}">Statement</a>@endif</div>
     @if ($bills->isNotEmpty())
-      <div class="tw"><table><thead><tr><th>Bill</th><th>Date</th><th style="text-align:right">Total</th><th>Status</th></tr></thead><tbody>
+      @php($live = $bills->whereNull('cancelled_at'))
+      <div class="billsum"><span class="muted">Charged <b class="mono" style="color:var(--ink)">{{ \App\Support\Money::inr($live->sum('total')) }}</b></span><span class="muted">Paid <b class="mono" style="color:var(--ok)">{{ \App\Support\Money::inr($live->sum('paid')) }}</b></span><span class="muted">Balance <b class="mono" style="color:{{ $live->sum(fn ($b) => $b->due()) ? 'var(--bad)' : 'var(--ink)' }}">{{ \App\Support\Money::inr($live->sum(fn ($b) => $b->due())) }}</b></span></div>
+      <div class="tw"><table class="mt"><thead><tr><th>Bill</th><th>Date</th><th style="text-align:right">Total</th><th>Status</th></tr></thead><tbody>
         @foreach ($bills as $b)
           @php([$bl, $bc] = \App\Models\Invoice::STATE[$b->state()])
-          <tr class="{{ $b->cancelled_at ? 'off' : '' }}"><td><a class="mono" href="{{ route('billing.show', $b) }}">{{ $b->number }}</a></td><td>{{ Fmt::date($b->date) }}</td><td class="mono" style="text-align:right">{{ \App\Support\Money::inr($b->total) }}</td><td><span class="chip {{ $bc }}">{{ $bl }}{{ $b->state() === 'PART' ? ' · '.\App\Support\Money::inr($b->due()).' due' : '' }}</span></td></tr>
+          <tr class="{{ $b->cancelled_at ? 'off' : '' }}"><td><a class="mono" href="{{ route('billing.show', $b) }}">{{ $b->number }}</a></td><td>{{ Fmt::date($b->date) }}</td><td class="mono mt-amt" style="text-align:right">{{ \App\Support\Money::inr($b->total) }}</td><td class="mt-end"><span class="chip {{ $bc }}">{{ $bl }}{{ $b->state() === 'PART' ? ' · '.\App\Support\Money::inr($b->due()).' due' : '' }}</span></td></tr>
         @endforeach
       </tbody></table></div>
     @else
