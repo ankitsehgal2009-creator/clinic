@@ -34,7 +34,8 @@
     <datalist id="rx-forms">@foreach (Rx::FORMS as $f)<option value="{{ $f }}">@endforeach</datalist>
     <datalist id="rx-timings">@foreach (Rx::TIMINGS as $f)<option value="{{ $f }}">@endforeach</datalist>
     <datalist id="rx-meds">@foreach ($medLib as $m)<option value="{{ $m->name }}" data-form="{{ $m->form }}" data-dose="{{ $m->dose }}" data-timing="{{ $m->timing }}" data-days="{{ $m->days }}">@endforeach</datalist>
-    <div class="tw" style="margin-top:12px"><table class="lines meds"><thead><tr><th>Medicine</th><th>Form</th><th>Dose</th><th>When</th><th>Days</th><th></th></tr></thead><tbody data-meds></tbody></table></div>
+    <div class="row" style="margin-top:12px"><label class="chk online-chk" title="Also look up medicine names that are not in your library"><input type="checkbox" data-online-meds> Search medicine names online too</label></div>
+    <div class="tw" style="margin-top:10px"><table class="lines meds"><thead><tr><th>Medicine</th><th>Form</th><th>Dose</th><th>When</th><th>Days</th><th></th></tr></thead><tbody data-meds></tbody></table></div>
     <template id="med-tpl"><tr>
       <td style="min-width:200px"><input class="inp" data-f="name" list="rx-meds" autocomplete="off" placeholder="e.g. Amoxicillin 500 mg" aria-label="Medicine"></td>
       <td style="width:115px"><input class="inp" data-f="form" list="rx-forms" placeholder="Form" aria-label="Form"></td>
@@ -43,7 +44,7 @@
       <td style="width:95px"><input class="inp" data-f="days" placeholder="5 days" aria-label="Days"></td>
       <td><button type="button" class="btn sm" data-del aria-label="Remove medicine">✕</button></td>
     </tr></template>
-    <div class="row" style="margin-top:12px"><button type="button" class="btn" data-add>+ Add medicine</button><a class="btn" href="{{ route('rx.medicines') }}">Medicine library</a><label class="chk online-chk" title="Also look up medicine names that are not in your library"><input type="checkbox" data-online-meds> Search medicine names online too</label></div>
+    <div class="row" style="margin-top:12px"><button type="button" class="btn" data-add>+ Add medicine</button><a class="btn" href="{{ route('rx.medicines') }}">Medicine library</a></div>
     <div class="field" style="margin-top:12px"><label for="ta">Advice printed below</label><textarea id="ta" name="advice" class="inp" rows="3" maxlength="2000">{{ old('advice', $edit?->advice) }}</textarea></div>
     <p class="hint">Dose is morning-afternoon-night, so 1-0-1 means one in the morning and one at night. Turn a template off to hide it from new visits.</p>
     <div class="row" style="margin-top:6px"><button class="btn pri">Save template</button></div>

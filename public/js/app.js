@@ -147,7 +147,13 @@
   document.addEventListener('pointerdown', function (e) {
     if (!sgBox) return;
     var o = e.target.closest('.sugg2 [data-i]');
-    if (o) { e.preventDefault(); sgPick(+o.dataset.i); } else if (!sgBox.contains(e.target) && e.target !== sgFor) sgClose();
+    if (o) {
+      e.preventDefault(); sgPick(+o.dataset.i);
+      // Phones send a click after the tap; once the list is gone it would land on whatever was underneath (e.g. "Edit this list").
+      var swallow = function (ev) { ev.preventDefault(); ev.stopPropagation(); off(); };
+      var off = function () { document.removeEventListener('click', swallow, true); };
+      document.addEventListener('click', swallow, true); setTimeout(off, 450);
+    } else if (!sgBox.contains(e.target) && e.target !== sgFor) sgClose();
   });
   window.addEventListener('resize', sgPlace);
   document.addEventListener('scroll', sgPlace, true);
